@@ -373,3 +373,46 @@ async def run_all_scenarios(client, progress_cb=None) -> list[ScenarioResult]:
         if progress_cb:
             progress_cb(r)
     return results
+
+
+def _sc_kg_memory_lifecycle() -> Scenario:
+    """知识图谱型记忆生命周期（适配官方 server-memory 工具族）"""
+    marker = f"KGMarker-{uuid.uuid4().hex[:6]}"
+
+    def _check_created(text, ctx):
+        ok = marker in text
+        return ok, f"实体已创建" if ok else f"创建响应中未见实体: {text[:80]}"
+
+    def _check_found(text, ctx):
+        ok = marker in text
+        return ok, "检索命中目标实体" if ok else f"检索未命中: {text[:80]}"
+
+    def _mk_entities_args(ctx):
+        return {"entities": [{"name": marker, "entityType": "TestEntity",
+                              "observations": ["横向基准测试实体"]}]}
+
+    def _mk_search_args(ctx):
+        return {"query": marker}
+
+    def _mk_delete_args(ctx):
+        return {"entityNames": [marker]}
+
+    def _check_gone(text, ctx):
+        ok = marker not in text
+        return ok, "删除后检索为空" if ok else f"实体仍可检索: {text[:80]}"
+
+    return Scenario(
+        name="SC-006 知识图谱记忆生命周期",
+        description="创建实体 → 搜索命中 → 删除实体 → 搜索为空（适配官方memory server）",
+        required_tools=["create_entities", "search_nodes", "delete_entities"],
+        steps=[
+            ("create_entities", _mk_entities_args, _check_created),
+            ("search_nodes", _mk_search_args, _check_found),
+            ("delete_entities", _mk_delete_args, lambda t, c: (True, "删除已执行")),
+            ("search_nodes", _mk_search_args, _check_gone),
+        ],
+    )
+
+
+# 注册到内置场景（原列表 + 新场景）
+BUILTIN_SCENARIOS = BUILTIN_SCENARIOS + [_sc_kg_memory_lifecycle]
