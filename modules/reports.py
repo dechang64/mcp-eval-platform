@@ -21,6 +21,21 @@ def render():
     run_detail = get_run(run["id"])
     results = get_run_results(run["id"])
 
+    # Export button
+    from core.report_export import export_run_markdown
+    try:
+        from core.scoring import compute_score as _cs
+        _score = _cs(results) if results else None
+    except Exception:
+        _score = None
+    _md = export_run_markdown(run, results, _score)
+    st.download_button(
+        "📥 导出Markdown报告",
+        data=_md,
+        file_name=f"mcp_eval_run_{run['id']}_{run['server_name']}.md",
+        mime="text/markdown",
+    )
+
     # Summary
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Server", run["server_name"])

@@ -181,13 +181,12 @@ get_run_results = get_results
 
 def save_run(run_data: dict, results: list[dict]) -> int:
     """一站式保存：创建run + 存所有result + finish"""
-    import time as _time
-    start = _time.time()
     rid = create_run(run_data["server_id"], run_data["server_name"], run_data["suite_type"])
     for r in results:
         add_result(rid, r["case_id"], r["case_name"], r["category"],
                    r["status"], r["duration_ms"], r.get("detail", {}), r.get("error_msg", ""))
-    dur = _time.time() - start
+    # 用例耗时之和即为测试总时长（比存库时间更有意义）
+    dur = sum(r.get("duration_ms", 0) for r in results) / 1000.0
     finish_run(rid, run_data["status"], run_data["total_cases"],
                run_data["passed"], run_data["failed"], 0, dur, {})
     return rid
