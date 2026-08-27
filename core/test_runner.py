@@ -1,4 +1,4 @@
-"""测试执行引擎 - 加载用例、执行、收集结果"""
+"""Test execution engine - load cases, execute, collect results"""
 import asyncio
 import json
 import os
@@ -29,7 +29,7 @@ class CaseResult:
 
 
 def resolve_template(template: dict, tools: list[ToolInfo]) -> dict:
-    """替换模板中的占位符"""
+    """Replace placeholders in a template"""
     if not template:
         return {}
     first_tool = tools[0].name if tools else "unknown"
@@ -43,7 +43,7 @@ def resolve_template(template: dict, tools: list[ToolInfo]) -> dict:
 
 
 def pick_callable_tool(tools: list[ToolInfo]) -> tuple[str, dict]:
-    """选一个可调用的tool（优先无必选参数的），返回(name, default_args)"""
+    """Pick a callable tool (prefer ones without required params), returns (name, default_args)"""
     for t in tools:
         schema = t.input_schema or {}
         props = schema.get("properties", {})
@@ -73,11 +73,11 @@ def pick_callable_tool(tools: list[ToolInfo]) -> tuple[str, dict]:
 
 
 def check_expected(result, expected: dict, tool_name: str = "") -> tuple[bool, str]:
-    """检查返回值是否符合预期"""
+    """Check whether the response matches expectations"""
     if not expected:
         return True, ""
 
-    # no_crash: 只要Server没断连就算通过
+    # no_crash: passes as long as the server did not disconnect
     if expected.get("no_crash") and result is not None:
         return True, ""
 
@@ -122,7 +122,7 @@ def check_expected(result, expected: dict, tool_name: str = "") -> tuple[bool, s
 
 
 async def run_functional_case(client: McpClient, case: dict, tools: list[ToolInfo]) -> CaseResult:
-    """执行单个功能测试用例"""
+    """Execute a single functional test case"""
     cid = case["id"]
     name = case["name"]
     method = case.get("method", "")
@@ -206,7 +206,7 @@ async def run_functional_case(client: McpClient, case: dict, tools: list[ToolInf
 
 
 async def run_performance_case(client: McpClient, case: dict, tools: list[ToolInfo]) -> CaseResult:
-    """执行性能测试用例"""
+    """Execute a performance test case"""
     cid = case["id"]
     name = case["name"]
     iterations = case.get("iterations", 20)
@@ -314,7 +314,7 @@ async def run_performance_case(client: McpClient, case: dict, tools: list[ToolIn
 
 
 async def run_security_case(client: McpClient, case: dict, tools: list[ToolInfo]) -> CaseResult:
-    """执行安全测试用例"""
+    """Execute a security test case"""
     cid = case["id"]
     name = case["name"]
     params = resolve_template(case.get("params_template", {}), tools)
@@ -357,7 +357,7 @@ async def run_security_case(client: McpClient, case: dict, tools: list[ToolInfo]
 
 
 async def run_suite(client: McpClient, suite_type: str = "all") -> list[CaseResult]:
-    """执行完整测试套件"""
+    """Execute the full test suite"""
     suites = load_suites()
     tools = await client.list_tools()
 

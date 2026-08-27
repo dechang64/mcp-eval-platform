@@ -1,4 +1,4 @@
-"""评分体系 - 根据测试结果计算综合评级"""
+"""Scoring system - compute overall grade from test results"""
 from dataclasses import dataclass
 
 
@@ -17,7 +17,7 @@ def _pct(passed: int, total: int) -> float:
 
 
 def _perf_score(results: list) -> float:
-    """性能分：P95延迟映射到0-100（<100ms=满分，>5s=0分）"""
+    """Performance score: map P95 latency to 0-100 (<100ms = full, >5s = zero)"""
     p95_values = []
     for r in results:
         if r.get("category") != "performance" or r.get("status") != "passed":
@@ -28,19 +28,19 @@ def _perf_score(results: list) -> float:
         try:
             import json
             detail = json.loads(raw) if isinstance(raw, str) else raw
-            # 直接存统计摘要的用例
+            # Cases that store summary statistics directly
             if "p95_ms" in detail:
                 p95_values.append(detail["p95_ms"])
-            # 并发用例取最大concurrency的p95
+            # Concurrency cases: take p95 across all concurrency levels
             for cr in detail.get("concurrency_results", []):
                 if "p95_ms" in cr:
                     p95_values.append(cr["p95_ms"])
         except Exception:
             pass
     if not p95_values:
-        return 50.0  # 无数据给中性分
-    p95 = max(p95_values)  # 取最差情况
-    # 100ms -> 100分, 5000ms -> 0分, 线性插值
+        return 50.0  # neutral score when no data
+    p95 = max(p95_values)  # worst case
+    # 100ms -> 100 points, 5000ms -> 0 points, linear interpolation
     if p95 <= 100:
         return 100.0
     if p95 >= 5000:
@@ -49,7 +49,7 @@ def _perf_score(results: list) -> float:
 
 
 def compute_score(results: list[dict]) -> Score:
-    """results: test_results 行列表（dict含 category/status/detail）"""
+    """results: list of test_result rows (dicts with category/status/detail)"""
     cats = {"functional": [], "performance": [], "security": []}
     for r in results:
         cat = r.get("category", "")
@@ -63,7 +63,7 @@ def compute_score(results: list[dict]) -> Score:
     sec_pct = _pct(sum(1 for r in sec_cases if r["status"] == "passed"), len(sec_cases))
     perf_pct = _perf_score(cats["performance"])
 
-    # 权重: 功能40% + 性能30% + 安全30%
+    # Weights: functional 40% + performance 30% + security 30%
     overall = func_pct * 0.4 + perf_pct * 0.3 + sec_pct * 0.3
 
     if overall >= 90:
@@ -79,23 +79,23 @@ def compute_score(results: list[dict]) -> Score:
 
     parts = []
     if func_pct >= 95:
-        parts.append("协议实现完整")
+        parts.append("complete protocol implementation")
     elif func_pct >= 70:
-        parts.append("基本功能可用，个别用例未通过")
+        parts.append("core functionality works, some cases failed")
     else:
-        parts.append("存在功能缺陷")
+        parts.append("functional defects present")
     if perf_pct >= 80:
-        parts.append("响应迅速")
+        parts.append("fast responses")
     elif perf_pct >= 50:
-        parts.append("性能中等")
+        parts.append("moderate latency")
     else:
-        parts.append("延迟偏高")
+        parts.append("high latency")
     if sec_pct >= 95:
-        parts.append("安全健壮")
+        parts.append("robust against adversarial inputs")
     else:
-        parts.append("安全用例有崩溃/异常")
+        parts.append("security cases crashed or errored")
 
-    return Score(letter, overall, func_pct, perf_pct, sec_pct, "；".join(parts))
+    return Score(letter, overall, func_pct, perf_pct, sec_pct, "; ".join(parts))
 
 
 def grade_color(letter: str) -> str:

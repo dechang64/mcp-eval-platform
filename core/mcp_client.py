@@ -1,4 +1,4 @@
-"""MCP客户端封装 - 支持stdio和SSE双transport"""
+"""MCP client wrapper - supports both stdio and SSE transports"""
 import asyncio
 import json
 import os
@@ -15,7 +15,7 @@ from mcp.client.sse import sse_client
 
 @dataclass
 class McpServerConfig:
-    """MCP Server连接配置"""
+    """MCP Server connection configuration"""
     name: str
     transport: str  # "stdio" or "sse"
     # stdio
@@ -69,7 +69,7 @@ class CallResult:
 
 
 class McpClient:
-    """MCP客户端 - 封装连接、发现、调用"""
+    """MCP client - connection, discovery, invocation"""
 
     def __init__(self, config: McpServerConfig):
         self.config = config
@@ -78,7 +78,7 @@ class McpClient:
         self._server_info: dict = {}
 
     async def connect(self) -> dict:
-        """连接MCP Server，返回server info"""
+        """Connect to the MCP server, returns server info"""
         try:
             if self.config.transport == "stdio":
                 params = StdioServerParameters(
@@ -110,7 +110,7 @@ class McpClient:
             return {"error": str(e)}
 
     async def list_tools(self) -> list[ToolInfo]:
-        """列出所有可用tools"""
+        """List all available tools"""
         if not self._session:
             return []
         result = await self._session.list_tools()
@@ -125,7 +125,7 @@ class McpClient:
         return self._tools
 
     async def call_tool(self, name: str, arguments: dict = None, timeout: float = 30) -> CallResult:
-        """调用指定tool"""
+        """Invoke the specified tool"""
         if not self._session:
             return CallResult(content=[], is_error=True, raw=None)
         try:
@@ -150,7 +150,7 @@ class McpClient:
             return CallResult(content=[{"type": "error", "text": str(e)}], is_error=True, raw=None)
 
     async def list_resources(self):
-        """列出resources（可选）"""
+        """List resources (optional)"""
         if not self._session:
             return None
         try:
@@ -160,7 +160,7 @@ class McpClient:
             return None
 
     async def list_prompts(self):
-        """列出prompts（可选）"""
+        """List prompts (optional)"""
         if not self._session:
             return None
         try:
@@ -170,7 +170,7 @@ class McpClient:
             return None
 
     async def close(self):
-        """关闭连接"""
+        """Close the connection"""
         try:
             if self._session:
                 await self._session.__aexit__(None, None, None)

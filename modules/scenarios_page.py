@@ -1,4 +1,4 @@
-"""模块8: 场景化测试 - 多工具协同工作流 + LLM Agent循环"""
+"""Module 8: Scenario Testing - multi-tool workflows + LLM Agent loop"""
 import asyncio
 import json
 import sys
@@ -21,12 +21,12 @@ def render():
 
 def st_header_scenarios():
     import streamlit as st
-    st.header("🎬 场景化测试")
-    st.caption("多工具协同工作流：上一步写入的数据下一步必须能读到。检验工具间状态一致性与LLM自主规划能力。")
+    st.header("🎬 Scenario Testing")
+    st.caption("Multi-tool collaborative workflows: data written by one step must be readable by the next. Verifies cross-tool state consistency and LLM autonomous planning.")
 
     _init_scenario_tables()
 
-    tab1, tab2 = st.tabs(["📋 内置场景套件", "🤖 LLM Agent循环"])
+    tab1, tab2 = st.tabs(["📋 Builtin Scenarios", "🤖 LLM Agent Loop"])
 
     with tab1:
         _render_scenario_tab()
@@ -40,22 +40,22 @@ def _render_scenario_tab():
 
     servers = list_servers()
     if not servers:
-        st.warning("请先在「Server管理」中注册MCP Server")
+        st.warning("Register an MCP Server in Server Manager first")
         return
 
     from core.agent_scenarios import BUILTIN_SCENARIOS
-    st.subheader("内置场景")
+    st.subheader("Builtin Scenarios")
     for factory in BUILTIN_SCENARIOS:
         sc = factory()
         c1, c2 = st.columns([3, 1])
         c1.markdown(f"**{sc.name}** — {sc.description}")
-        c2.caption(f"需要 {len(sc.required_tools)} 个工具")
+        c2.caption(f"Requires {len(sc.required_tools)} tools")
 
     server_names = [s["name"] for s in servers]
-    selected = st.selectbox("选择MCP Server", server_names, key="scen_server")
+    selected = st.selectbox("Select MCP Server", server_names, key="scen_server")
     s = next(x for x in servers if x["name"] == selected)
 
-    if st.button("🚀 运行场景套件", key="run_scen"):
+    if st.button("🚀 Run Scenario Suite", key="run_scen"):
         _run_scenarios(s)
 
     _render_scenario_history()
@@ -66,7 +66,7 @@ def _run_scenarios(server: dict):
     from core.mcp_client import McpClient, McpServerConfig
     from core.agent_scenarios import run_all_scenarios
 
-    progress = st.progress(0, text="连接Server...")
+    progress = st.progress(0, text="Connecting to server...")
     cfg = McpServerConfig.from_dict(json.loads(server["config_json"]))
 
     async def _run():
@@ -84,30 +84,30 @@ def _run_scenarios(server: dict):
         rows = []
         for r in results:
             rows.append({
-                "场景": r.name, "状态": {"passed": "✅", "failed": "❌", "skipped": "⏭️"}.get(r.status, "❓"),
-                "步骤": f"{r.passed_steps}/{len(r.steps)}", "耗时": f"{r.duration_ms:.0f}ms",
+                "Scenario": r.name, "Status": {"passed": "✅", "failed": "❌", "skipped": "⏭️"}.get(r.status, "❓"),
+                "Steps": f"{r.passed_steps}/{len(r.steps)}", "Duration": f"{r.duration_ms:.0f}ms",
             })
         st.dataframe(rows, use_container_width=True, hide_index=True)
 
         for r in results:
             if r.status == "skipped":
-                st.caption(f"⏭️ {r.name}：缺少所需工具，跳过")
+                st.caption(f"⏭️ {r.name}: required tools missing, skipped")
                 continue
             icon = "✅" if r.status == "passed" else "❌"
-            with st.expander(f"{icon} {r.name}（{r.passed_steps}/{len(r.steps)} 步）"):
+            with st.expander(f"{icon} {r.name} ({r.passed_steps}/{len(r.steps)} steps)"):
                 for i, s in enumerate(r.steps, 1):
                     mark = "·" if s.ok else "×"
-                    st.markdown(f"`{mark}` **步骤{i}** `{s.tool}` ({s.duration_ms:.0f}ms) — {s.message or 'OK'}")
+                    st.markdown(f"`{mark}` **Step {i}** `{s.tool}` ({s.duration_ms:.0f}ms) — {s.message or 'OK'}")
                     if s.args:
                         st.json(s.args)
                     if s.response_snippet and not s.ok:
                         st.code(s.response_snippet)
 
         _save_scenario_run(server, results)
-        st.success(f"场景套件完成：{passed}/{total} 通过，已入库")
+        st.success(f"Scenario suite finished: {passed}/{total} passed, saved to database")
 
     except Exception as e:
-        st.error(f"场景测试失败: {e}")
+        st.error(f"Scenario testing failed: {e}")
 
 
 def _render_agent_tab():
@@ -117,22 +117,22 @@ def _render_agent_tab():
 
     servers = list_servers()
     if not servers:
-        st.warning("请先在「Server管理」中注册MCP Server")
+        st.warning("Register an MCP Server in Server Manager first")
         return
 
     tasks = builtin_agent_tasks()
     task_names = [t["name"] for t in tasks]
-    tn = st.selectbox("复合任务", task_names, key="agent_task")
+    tn = st.selectbox("Composite Task", task_names, key="agent_task")
     task_def = next(t for t in tasks if t["name"] == tn)
     st.info(task_def["task"])
 
     server_names = [s["name"] for s in servers]
-    selected = st.selectbox("选择MCP Server", server_names, key="agent_server")
+    selected = st.selectbox("Select MCP Server", server_names, key="agent_server")
     s = next(x for x in servers if x["name"] == selected)
 
-    max_rounds = st.slider("最大循环轮数", 4, 15, 8)
+    max_rounds = st.slider("Max loop rounds", 4, 15, 8)
 
-    if st.button("🤖 启动Agent循环", key="run_agent"):
+    if st.button("🤖 Start Agent Loop", key="run_agent"):
         _run_agent(s, task_def, max_rounds)
 
     _render_agent_history()
@@ -143,7 +143,7 @@ def _run_agent(server, task_def, max_rounds):
     from core.mcp_client import McpClient, McpServerConfig
     from core.agent_loop import run_agent_loop
 
-    progress = st.progress(0, text="Agent规划中...")
+    progress = st.progress(0, text="Agent planning...")
     cfg = McpServerConfig.from_dict(json.loads(server["config_json"]))
 
     async def _run():
@@ -156,23 +156,23 @@ def _run_agent(server, task_def, max_rounds):
     try:
         result = asyncio.run(_run())
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("终态校验", "✅ 通过" if result.completed else "❌ 失败")
-        c2.metric("工具调用数", len(result.steps))
-        c3.metric("评级", result.grade)
-        c4.metric("耗时", f"{result.duration_ms:.0f}ms")
+        c1.metric("End-State Check", "✅ Passed" if result.completed else "❌ Failed")
+        c2.metric("Tool Calls", len(result.steps))
+        c3.metric("Grade", result.grade)
+        c4.metric("Duration", f"{result.duration_ms:.0f}ms")
 
         for s in result.steps:
             icon = "✅" if s.ok else "❌"
-            with st.expander(f"{icon} 轮次{s.round_no}: {s.tool}"):
+            with st.expander(f"{icon} Round {s.round_no}: {s.tool}"):
                 st.json(s.args)
                 st.code(s.response_snippet)
 
-        st.markdown(f"**结束原因**: {result.done_reason} | **终态**: {result.end_check_msg}")
+        st.markdown(f"**Done reason**: {result.done_reason} | **End state**: {result.end_check_msg}")
         _save_agent_run(server, task_def, result)
-        st.success("Agent循环完成，已入库")
+        st.success("Agent loop finished, saved to database")
 
     except Exception as e:
-        st.error(f"Agent循环失败: {e}")
+        st.error(f"Agent loop failed: {e}")
 
 
 def _init_scenario_tables():
@@ -243,31 +243,31 @@ def _save_agent_run(server, task_def, result):
 def _render_scenario_history():
     import streamlit as st
     from core.results_store import get_db
-    st.subheader("历史场景运行")
+    st.subheader("Scenario Run History")
     conn = get_db()
     rows = conn.execute("SELECT id, server_name, passed, total, created_at FROM scenario_runs ORDER BY id DESC LIMIT 10").fetchall()
     conn.close()
     if not rows:
-        st.caption("暂无历史")
+        st.caption("No history yet")
         return
     st.dataframe([{
         "ID": r["id"], "Server": r["server_name"],
-        "通过": f"{r['passed']}/{r['total']}", "时间": r["created_at"][:19],
+        "Passed": f"{r['passed']}/{r['total']}", "Time": r["created_at"][:19],
     } for r in rows], use_container_width=True, hide_index=True)
 
 
 def _render_agent_history():
     import streamlit as st
     from core.results_store import get_db
-    st.subheader("历史Agent运行")
+    st.subheader("Agent Run History")
     conn = get_db()
     rows = conn.execute("SELECT id, server_name, task_name, completed, rounds, grade, created_at FROM agent_runs ORDER BY id DESC LIMIT 10").fetchall()
     conn.close()
     if not rows:
-        st.caption("暂无历史")
+        st.caption("No history yet")
         return
     st.dataframe([{
-        "ID": r["id"], "Server": r["server_name"], "任务": r["task_name"],
-        "终态": "✅" if r["completed"] else "❌", "轮数": r["rounds"],
-        "评级": r["grade"], "时间": r["created_at"][:19],
+        "ID": r["id"], "Server": r["server_name"], "Task": r["task_name"],
+        "End-State": "✅" if r["completed"] else "❌", "Rounds": r["rounds"],
+        "Grade": r["grade"], "Time": r["created_at"][:19],
     } for r in rows], use_container_width=True, hide_index=True)

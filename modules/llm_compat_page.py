@@ -1,8 +1,8 @@
-"""模块7: LLM兼容性测试
+"""Module 7: LLM Compatibility Testing
 
-让真实LLM阅读被测Server的工具描述，测试：
-  1. 工具选择准确率（LLM能否选对工具）
-  2. 参数填充合规率（LLM填的参数能否通过schema校验）
+A real LLM reads the tool descriptions of the server under test and is measured on:
+  1. Tool selection accuracy (does the LLM pick the right tool?)
+  2. Argument schema compliance (do the filled args pass schema validation?)
 """
 import streamlit as st
 import json
@@ -17,54 +17,54 @@ def render():
     from core.mcp_client import McpClient, McpServerConfig
     from modules.utils import fmt_timestamp
 
-    st.header("🤖 LLM兼容性测试")
-    st.caption("让真实LLM阅读工具描述并执行任务——检验Server的\"LLM可理解性\"。依赖 z-ai CLI + glm-4-plus。")
+    st.header("🤖 LLM Compatibility")
+    st.caption("A real LLM reads tool descriptions and executes tasks — measuring how \"LLM-legible\" the server is. Requires z-ai CLI + glm-4-plus.")
 
     # Init llm tables
     _init_llm_tables()
 
     servers = list_servers()
     if not servers:
-        st.warning("请先在「Server管理」中注册MCP Server")
+        st.warning("Register an MCP Server in Server Manager first")
         return
 
     server_names = [s["name"] for s in servers]
-    selected_name = st.selectbox("选择MCP Server", server_names)
+    selected_name = st.selectbox("Select MCP Server", server_names)
     selected_server = next(s for s in servers if s["name"] == selected_name)
-    max_tools = st.slider("最多测试工具数", 3, 20, 14, help="工具多时LLM任务生成和执行时间长")
+    max_tools = st.slider("Max tools to test", 3, 20, 14, help="More tools = longer task generation and execution time")
 
-    if st.button("🚀 生成任务并测试", type="primary", use_container_width=True):
+    if st.button("🚀 Generate Tasks & Run", type="primary", use_container_width=True):
         _run_llm_compat(selected_server, max_tools)
 
     st.divider()
 
     # History
-    st.subheader("历史LLM兼容性测试")
+    st.subheader("History")
     runs = _list_llm_runs()
     if not runs:
-        st.info("暂无LLM兼容性测试记录")
+        st.info("No LLM compatibility runs yet")
         return
     for r in runs:
         col1, col2, col3, col4, col5 = st.columns([2, 1.5, 1.5, 1.5, 1.5])
         col1.markdown(f"**{r['server_name']}** (Run #{r['id']})")
         grade_color = {"A+": "green", "A": "green", "B": "blue", "C": "orange", "D": "red"}.get(r["grade"], "gray")
-        col2.markdown(f":{grade_color}[**{r['grade']}** ({r['overall']:.0f}分)]")
-        col3.caption(f"工具选择 {r['tool_correct']}/{r['total']}")
-        col4.caption(f"参数合规 {r['args_valid']}/{r['total']}")
+        col2.markdown(f":{grade_color}[**{r['grade']}** ({r['overall']:.0f})]")
+        col3.caption(f"Tool selection {r['tool_correct']}/{r['total']}")
+        col4.caption(f"Args valid {r['args_valid']}/{r['total']}")
         col5.caption(fmt_timestamp(r["created_at"]))
 
-        with st.expander(f"明细 - Run #{r['id']}"):
+        with st.expander(f"Details - Run #{r['id']}"):
             results = _get_llm_results(r["id"])
             rows = []
             for x in results:
                 mark = "✅" if x["tool_correct"] and x["args_valid"] else ("⚠️" if x["tool_correct"] else "❌")
                 rows.append({
-                    "预期工具": x["tool_name"],
-                    "LLM选择": x["llm_tool"],
-                    "任务": x["task"][:50],
-                    "选对": "✅" if x["tool_correct"] else "❌",
-                    "参数合规": "✅" if x["args_valid"] else f"❌ {x['args_error'][:40]}",
-                    "状态": mark,
+                    "Expected Tool": x["tool_name"],
+                    "LLM Choice": x["llm_tool"],
+                    "Task": x["task"][:50],
+                    "Correct": "✅" if x["tool_correct"] else "❌",
+                    "Args OK": "✅" if x["args_valid"] else f"❌ {x['args_error'][:40]}",
+                    "Status": mark,
                 })
             st.dataframe(rows, use_container_width=True, hide_index=True)
 
@@ -110,19 +110,19 @@ def _run_llm_compat(server: dict, max_tools: int):
     from modules.utils import run_async
     from datetime import datetime
 
-    progress = st.progress(0, text="连接MCP Server...")
+    progress = st.progress(0, text="Connecting to MCP Server...")
     try:
         cfg = McpServerConfig.from_dict(json.loads(server["config_json"]))
         client = McpClient(cfg)
         run_async(client.connect())
         tools = run_async(client.list_tools())
         run_async(client.close())
-        progress.progress(10, text=f"已获取 {len(tools)} 个工具，正在生成测试任务...")
+        progress.progress(10, text=f"Fetched {len(tools)} tools, generating test tasks...")
 
         tasks = generate_tasks(tools, max_tools=max_tools)
-        progress.progress(30, text=f"已生成 {len(tasks)} 个任务，开始LLM测试（每个任务一次LLM调用）...")
+        progress.progress(30, text=f"Generated {len(tasks)} tasks, starting LLM evaluation (one LLM call per task)...")
 
-        # 逐任务执行，更新进度
+        # Execute task by task, updating progress
         results = []
         from core.llm_compat import llm_call, extract_json, _type_ok, SELECT_SYSTEM, build_tool_catalog
         catalog = build_tool_catalog(tools)
@@ -131,14 +131,14 @@ def _run_llm_compat(server: dict, max_tools: int):
             task = task_item["task"]
             expected_tool = task_item["tool"]
             start = time.time()
-            prompt = f"""你可以调用以下MCP工具：
+            prompt = f"""You can call the following MCP tools:
 
 {catalog}
 
-用户说："{task}"
+The user says: "{task}"
 
-你应该调用哪个工具？如何填参数？
-只输出JSON：{{"tool": "工具名", "arguments": {{...}}}}"""
+Which tool should you call, and with what arguments?
+Output JSON only: {{"tool": "tool_name", "arguments": {{...}}}}"""
             try:
                 reply = llm_call(prompt, SELECT_SYSTEM)
                 data = extract_json(reply) or {}
@@ -149,7 +149,7 @@ def _run_llm_compat(server: dict, max_tools: int):
             except Exception as e:
                 llm_tool, llm_args = "", {}
                 tool_correct, args_valid = False, False
-                args_error = f"LLM调用失败: {str(e)[:80]}"
+                args_error = f"LLM call failed: {str(e)[:80]}"
                 results.append(_mk_result(expected_tool, task, llm_tool, llm_args, tool_correct, args_valid, args_error, start))
                 progress.progress(30 + int(60 * (i + 1) / len(tasks)), text=f"[{i+1}/{len(tasks)}] {task[:30]}...")
                 continue
@@ -164,20 +164,20 @@ def _run_llm_compat(server: dict, max_tools: int):
                 missing = [r for r in required if r not in llm_args]
                 if missing:
                     args_valid = False
-                    args_error = f"缺少必填参数: {missing}"
+                    args_error = f"Missing required args: {missing}"
                 props = schema.get("properties", {})
                 for k, v in llm_args.items():
                     if k in props and not _type_ok(v, props[k].get("type")):
                         args_valid = False
-                        args_error += f"参数{k}类型错误 "
+                        args_error += f"Arg {k} has wrong type "
             else:
-                args_error = f"选错工具: 期望{expected_tool}, 实际{llm_tool}"
+                args_error = f"Wrong tool: expected {expected_tool}, got {llm_tool}"
             results.append(_mk_result(expected_tool, task, llm_tool, llm_args, tool_correct, args_valid, args_error, start))
             progress.progress(30 + int(60 * (i + 1) / len(tasks)), text=f"[{i+1}/{len(tasks)}] {task[:30]}...")
 
-        progress.progress(95, text="汇总评分...")
+        progress.progress(95, text="Scoring...")
 
-        # 汇总+存库
+        # Summarize + persist
         from core.llm_compat import CompatResult, summarize
         compat_results = [CompatResult(**r) for r in results]
         s = summarize(compat_results)
@@ -201,20 +201,20 @@ def _run_llm_compat(server: dict, max_tools: int):
         conn.commit()
         conn.close()
 
-        progress.progress(100, text=f"完成！Run #{rid}")
+        progress.progress(100, text=f"Done! Run #{rid}")
 
-        # 显示结果
+        # Show results
         st.divider()
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("综合评级", s.grade, f"{s.overall:.0f}分")
-        c2.metric("工具选择准确率", f"{s.tool_accuracy:.0f}%")
-        c3.metric("参数合规率", f"{s.args_valid_rate:.0f}%")
-        c4.metric("测试工具数", s.total)
+        c1.metric("Overall Grade", s.grade, f"{s.overall:.0f}")
+        c2.metric("Tool Selection Accuracy", f"{s.tool_accuracy:.0f}%")
+        c3.metric("Args Compliance", f"{s.args_valid_rate:.0f}%")
+        c4.metric("Tools Tested", s.total)
         st.rerun()
 
     except Exception as e:
-        progress.progress(100, text=f"测试失败: {e}")
-        st.error(f"LLM兼容性测试失败: {e}")
+        progress.progress(100, text=f"Test failed: {e}")
+        st.error(f"LLM compatibility test failed: {e}")
 
 
 def _mk_result(expected_tool, task, llm_tool, llm_args, tool_correct, args_valid, args_error, start):

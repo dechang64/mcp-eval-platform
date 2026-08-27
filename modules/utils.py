@@ -1,4 +1,4 @@
-"""公共工具函数"""
+"""Shared utility functions"""
 import json
 import asyncio
 import sys
@@ -30,7 +30,7 @@ def status_badge(status: str) -> str:
 
 
 def run_async(coro):
-    """在Streamlit中运行async函数"""
+    """Run an async coroutine inside Streamlit"""
     try:
         loop = asyncio.new_event_loop()
         result = loop.run_until_complete(coro)

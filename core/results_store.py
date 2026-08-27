@@ -1,4 +1,4 @@
-"""SQLite结果存储 - Server配置/测试结果/历史记录"""
+"""SQLite result store - server configs / test results / run history"""
 import json
 import sqlite3
 import os
@@ -180,12 +180,12 @@ get_run_results = get_results
 
 
 def save_run(run_data: dict, results: list[dict]) -> int:
-    """一站式保存：创建run + 存所有result + finish"""
+    """One-stop save: create run + store all results + finish"""
     rid = create_run(run_data["server_id"], run_data["server_name"], run_data["suite_type"])
     for r in results:
         add_result(rid, r["case_id"], r["case_name"], r["category"],
                    r["status"], r["duration_ms"], r.get("detail", {}), r.get("error_msg", ""))
-    # 用例耗时之和即为测试总时长（比存库时间更有意义）
+    # Sum of case durations = total test duration (more meaningful than DB write time)
     dur = sum(r.get("duration_ms", 0) for r in results) / 1000.0
     finish_run(rid, run_data["status"], run_data["total_cases"],
                run_data["passed"], run_data["failed"], 0, dur, {})

@@ -1,4 +1,4 @@
-"""模块2: MCP Server管理"""
+"""Module 2: MCP Server Manager"""
 import streamlit as st
 import json
 import os
@@ -6,25 +6,25 @@ import os
 def render():
     from core.results_store import list_servers, add_server, delete_server, get_server
 
-    st.header("🖥️ Server管理")
+    st.header("🖥️ Server Manager")
 
     # Add new server
-    with st.expander("➕ 添加MCP Server", expanded=False):
+    with st.expander("➕ Register MCP Server", expanded=False):
         with st.form("add_server_form"):
-            name = st.text_input("名称", placeholder="如：FedCtx MCP Server")
-            description = st.text_input("描述", placeholder="简要说明")
-            transport = st.selectbox("Transport", ["stdio", "sse"], help="stdio=本地子进程, sse=远程HTTP")
+            name = st.text_input("Name", placeholder="e.g. FedCtx MCP Server")
+            description = st.text_input("Description", placeholder="Brief description")
+            transport = st.selectbox("Transport", ["stdio", "sse"], help="stdio = local subprocess, sse = remote HTTP")
 
             if transport == "stdio":
-                command = st.text_input("命令", placeholder="如：python 或 /path/to/binary")
-                args_str = st.text_input("参数（空格分隔）", placeholder="如：-m mcp_server --port 8080")
-                env_str = st.text_input("环境变量（KEY=VALUE, 逗号分隔）", placeholder="如：API_KEY=xxx, DEBUG=true")
+                command = st.text_input("Command", placeholder="e.g. python or /path/to/binary")
+                args_str = st.text_input("Arguments (space-separated)", placeholder="e.g. -m mcp_server --port 8080")
+                env_str = st.text_input("Environment variables (KEY=VALUE, comma-separated)", placeholder="e.g. API_KEY=xxx, DEBUG=true")
             else:
-                url = st.text_input("SSE URL", placeholder="如：http://localhost:8080/sse")
+                url = st.text_input("SSE URL", placeholder="e.g. http://localhost:8080/sse")
 
-            tags_str = st.text_input("标签（逗号分隔）", placeholder="如：rust, vector-db, memory")
+            tags_str = st.text_input("Tags (comma-separated)", placeholder="e.g. rust, vector-db, memory")
 
-            submitted = st.form_submit_button("添加")
+            submitted = st.form_submit_button("Register")
             if submitted and name:
                 config = {"transport": transport}
                 if transport == "stdio":
@@ -45,14 +45,14 @@ def render():
 
                 tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
                 sid = add_server(name, transport, config, description, tags)
-                st.success(f"已添加Server「{name}」(ID: {sid})")
+                st.success(f"Server \"{name}\" registered (ID: {sid})")
                 st.rerun()
 
     # Server list
-    st.subheader("已注册Server")
+    st.subheader("Registered Servers")
     servers = list_servers()
     if not servers:
-        st.info("暂无注册的Server。点击上方「添加MCP Server」开始。")
+        st.info("No servers registered yet. Click \"Register MCP Server\" above to get started.")
     else:
         for s in servers:
             cfg = json.loads(s["config_json"])
@@ -74,7 +74,7 @@ def render():
                     if s["description"]:
                         st.caption(s["description"])
                 with col3:
-                    if st.button("删除", key=f"del_{s['id']}", type="secondary"):
+                    if st.button("Delete", key=f"del_{s['id']}", type="secondary"):
                         delete_server(s["id"])
                         st.rerun()
                 st.divider()

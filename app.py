@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP综合评测系统 - Web平台
+"""MCP Evaluation Platform - Web UI
 
 Usage: streamlit run app.py --server.port 8501
 """
@@ -8,42 +8,42 @@ import sys
 import os
 
 st.set_page_config(
-    page_title="MCP综合评测系统",
+    page_title="MCP Evaluation Platform",
     page_icon="🔧",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # Sidebar navigation
-st.sidebar.title("MCP综合评测系统")
-st.sidebar.caption("Model Context Protocol Evaluation Platform")
+st.sidebar.title("MCP Evaluation Platform")
+st.sidebar.caption("Model Context Protocol Server Evaluation")
 
-page = st.sidebar.radio("导航", [
-    "📊 仪表板",
-    "🖥️ Server管理",
-    "📋 测试套件",
-    "▶️ 测试运行",
-    "🤖 LLM兼容性",
-    "🎬 场景化测试",
-    "📝 报告详情",
-    "🔄 横向对比",
+page = st.sidebar.radio("Navigation", [
+    "📊 Dashboard",
+    "🖥️ Server Manager",
+    "📋 Test Suites",
+    "▶️ Test Runs",
+    "🤖 LLM Compatibility",
+    "🎬 Scenario Testing",
+    "📝 Reports",
+    "🔄 Comparison",
 ])
 
-if page == "📊 仪表板":
+if page == "📊 Dashboard":
     from modules.dashboard import render
-elif page == "🖥️ Server管理":
+elif page == "🖥️ Server Manager":
     from modules.server_manager import render
-elif page == "📋 测试套件":
+elif page == "📋 Test Suites":
     from modules.test_suites import render
-elif page == "▶️ 测试运行":
+elif page == "▶️ Test Runs":
     from modules.test_runs import render
-elif page == "🤖 LLM兼容性":
+elif page == "🤖 LLM Compatibility":
     from modules.llm_compat_page import render
-elif page == "🎬 场景化测试":
+elif page == "🎬 Scenario Testing":
     from modules.scenarios_page import render
-elif page == "📝 报告详情":
+elif page == "📝 Reports":
     from modules.reports import render
-elif page == "🔄 横向对比":
+elif page == "🔄 Comparison":
     from modules.compare import render
 
 render()

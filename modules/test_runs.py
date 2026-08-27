@@ -1,4 +1,4 @@
-"""模块4: 测试运行"""
+"""Module 4: Test Runs"""
 import streamlit as st
 import json
 import time
@@ -14,21 +14,21 @@ def render():
     from core.test_runner import run_suite, load_suites
     from modules.utils import status_badge, fmt_timestamp
 
-    st.header("▶️ 测试运行")
+    st.header("▶️ Test Runs")
 
     servers = list_servers()
     if not servers:
-        st.warning("请先在「Server管理」中注册MCP Server")
+        st.warning("Register an MCP Server in Server Manager first")
         return
 
     # Select server
     server_names = [s["name"] for s in servers]
-    selected_name = st.selectbox("选择MCP Server", server_names)
+    selected_name = st.selectbox("Select MCP Server", server_names)
     selected_server = next(s for s in servers if s["name"] == selected_name)
 
     # Select suite
-    suite_type = st.selectbox("测试套件", ["all", "functional", "performance", "security"],
-                              format_func=lambda x: {"all": "全部", "functional": "功能", "performance": "性能", "security": "安全"}[x])
+    suite_type = st.selectbox("Test Suite", ["all", "functional", "performance", "security"],
+                              format_func=lambda x: {"all": "All", "functional": "Functional", "performance": "Performance", "security": "Security"}[x])
 
     # Config
     config = json.loads(selected_server["config_json"])
@@ -37,7 +37,7 @@ def render():
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**Server信息**")
+        st.markdown("**Server Info**")
         st.json({
             "name": selected_server["name"],
             "transport": selected_server["transport"],
@@ -48,11 +48,11 @@ def render():
     with col2:
         suites = load_suites()
         counts = {k: len(v) for k, v in suites.items()}
-        st.markdown("**套件用例数**")
+        st.markdown("**Suite Case Counts**")
         st.json(counts)
 
     # Run button
-    if st.button("🚀 开始测试", type="primary"):
+    if st.button("🚀 Run Tests", type="primary"):
         # Build config
         mc = McpServerConfig(
             name=selected_server["name"],
@@ -63,17 +63,17 @@ def render():
             url=config.get("url", ""),
         )
 
-        progress = st.progress(0, text="正在连接MCP Server...")
+        progress = st.progress(0, text="Connecting to MCP Server...")
         status_area = st.empty()
 
         async def execute():
             client = McpClient(mc)
             try:
                 await client.connect()
-                progress.progress(10, text="已连接，开始测试...")
+                progress.progress(10, text="Connected, running tests...")
 
                 results = await run_suite(client, suite_type)
-                progress.progress(80, text="测试完成，保存结果...")
+                progress.progress(80, text="Tests finished, saving results...")
 
                 total = len(results)
                 passed = sum(1 for r in results if r.status == "passed")
@@ -92,7 +92,7 @@ def render():
                     "status": status,
                 }
                 run_id = save_run(run_data, [r.__dict__ for r in results])
-                progress.progress(100, text=f"测试完成！Run ID: {run_id}")
+                progress.progress(100, text=f"Done! Run ID: {run_id}")
 
                 return run_id, results
 
@@ -109,7 +109,7 @@ def render():
                     "status": "error",
                 }
                 run_id = save_run(run_data, [])
-                progress.progress(100, text=f"测试失败: {e}")
+                progress.progress(100, text=f"Test failed: {e}")
                 return run_id, []
 
             finally:
@@ -121,27 +121,27 @@ def render():
         run_id, results = asyncio.run(execute())
 
         if results:
-            st.success(f"测试完成！Run ID: {run_id}")
-            st.markdown(f"**通过**: {sum(1 for r in results if r.status == 'passed')} | "
-                        f"**失败**: {sum(1 for r in results if r.status == 'failed')} | "
-                        f"**错误**: {sum(1 for r in results if r.status == 'error')}")
+            st.success(f"Tests completed! Run ID: {run_id}")
+            st.markdown(f"**Passed**: {sum(1 for r in results if r.status == 'passed')} | "
+                        f"**Failed**: {sum(1 for r in results if r.status == 'failed')} | "
+                        f"**Errors**: {sum(1 for r in results if r.status == 'error')}")
 
             # Show results table
             rows = []
             for r in results:
                 rows.append({
                     "ID": r.case_id,
-                    "用例": r.case_name,
-                    "类别": r.category,
-                    "状态": status_badge(r.status),
-                    "耗时": f"{r.duration_ms:.0f}ms",
-                    "详情": r.error_msg[:80] if r.error_msg else "",
+                    "Case": r.case_name,
+                    "Category": r.category,
+                    "Status": status_badge(r.status),
+                    "Duration": f"{r.duration_ms:.0f}ms",
+                    "Detail": r.error_msg[:80] if r.error_msg else "",
                 })
             st.dataframe(rows, use_container_width=True, hide_index=True)
 
     # Recent runs
     st.divider()
-    st.subheader("最近运行")
+    st.subheader("Recent Runs")
     runs = list_runs(limit=5)
     if runs:
         for r in runs:
