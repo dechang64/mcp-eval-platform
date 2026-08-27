@@ -24,6 +24,7 @@ page = st.sidebar.radio("导航", [
     "📋 测试套件",
     "▶️ 测试运行",
     "🤖 LLM兼容性",
+    "🎬 场景化测试",
     "📝 报告详情",
     "🔄 横向对比",
 ])
@@ -38,6 +39,8 @@ elif page == "▶️ 测试运行":
     from modules.test_runs import render
 elif page == "🤖 LLM兼容性":
     from modules.llm_compat_page import render
+elif page == "🎬 场景化测试":
+    from modules.scenarios_page import render
 elif page == "📝 报告详情":
     from modules.reports import render
 elif page == "🔄 横向对比":
