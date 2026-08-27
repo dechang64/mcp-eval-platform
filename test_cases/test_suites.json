@@ -1,0 +1,149 @@
+{
+  "functional": [
+    {
+      "id": "FN-001",
+      "name": "MCP握手初始化",
+      "description": "验证Server正确完成MCP协议握手",
+      "method": "initialize",
+      "params": {"protocol_version": "2024-11-05"},
+      "expected": {"protocol_version": "not_null", "capabilities": "exists", "server_info": "exists"},
+      "timeout": 10
+    },
+    {
+      "id": "FN-002",
+      "name": "列出可用Tools",
+      "description": "验证Server能正确返回tool列表",
+      "method": "tools/list",
+      "params": {},
+      "expected": {"tools": "array, non_empty"},
+      "timeout": 10
+    },
+    {
+      "id": "FN-003",
+      "name": "调用Tool（有效参数）",
+      "description": "用空参数调用第一个tool，验证返回结构正确",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {}},
+      "expected": {"content": "exists", "is_error": false},
+      "timeout": 30
+    },
+    {
+      "id": "FN-004",
+      "name": "调用不存在的Tool",
+      "description": "验证对不存在tool的调用返回错误而非崩溃",
+      "method": "tools/call",
+      "params": {"name": "__nonexistent_tool__", "arguments": {}},
+      "expected": {"is_error": true, "no_crash": true},
+      "timeout": 10
+    },
+    {
+      "id": "FN-005",
+      "name": "调用Tool（无效参数）",
+      "description": "用错误参数名调用tool，验证错误处理",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {"__invalid_param__": true}},
+      "expected": {"is_error": true, "no_crash": true},
+      "timeout": 10
+    },
+    {
+      "id": "FN-006",
+      "name": "列出资源（如支持）",
+      "description": "尝试列出resources，不支持则标记skip",
+      "method": "resources/list",
+      "params": {},
+      "expected": {"resources": "array"},
+      "optional": true,
+      "timeout": 10
+    },
+    {
+      "id": "FN-007",
+      "name": "列出Prompts（如支持）",
+      "description": "尝试列出prompts，不支持则标记skip",
+      "method": "prompts/list",
+      "params": {},
+      "expected": {"prompts": "array"},
+      "optional": true,
+      "timeout": 10
+    }
+  ],
+  "performance": [
+    {
+      "id": "PF-001",
+      "name": "Tool调用延迟",
+      "description": "测量tool调用的p50/p95/p99延迟",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {}},
+      "iterations": 20,
+      "metrics": ["p50_ms", "p95_ms", "p99_ms", "mean_ms"],
+      "timeout": 120
+    },
+    {
+      "id": "PF-002",
+      "name": "并发Tool调用",
+      "description": "不同并发级别下的吞吐量",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {}},
+      "concurrency_levels": [1, 5, 10],
+      "iterations_per_level": 10,
+      "metrics": ["throughput_rps", "error_rate"],
+      "timeout": 120
+    },
+    {
+      "id": "PF-003",
+      "name": "连续调用稳定性",
+      "description": "连续50次调用，检测内存泄漏或性能衰减",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {}},
+      "iterations": 50,
+      "metrics": ["trend_slope", "max_vs_min_ratio"],
+      "timeout": 120
+    }
+  ],
+  "security": [
+    {
+      "id": "SEC-001",
+      "name": "SQL注入参数",
+      "description": "在参数中注入SQL，验证Server不崩溃",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {"query": "'; DROP TABLE--"}},
+      "expected": {"no_crash": true},
+      "timeout": 10
+    },
+    {
+      "id": "SEC-002",
+      "name": "路径遍历参数",
+      "description": "在参数中尝试路径遍历",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {"path": "../../../etc/passwd"}},
+      "expected": {"no_crash": true},
+      "timeout": 10
+    },
+    {
+      "id": "SEC-003",
+      "name": "超长参数",
+      "description": "发送10KB超长字符串参数",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {"data": "{long_string_10k}"}},
+      "expected": {"no_crash": true},
+      "timeout": 10
+    },
+    {
+      "id": "SEC-004",
+      "name": "特殊字符参数",
+      "description": "发送含null/控制字符的参数",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {"data": "{special_chars}"}},
+      "expected": {"no_crash": true},
+      "timeout": 10
+    },
+    {
+      "id": "SEC-005",
+      "name": "超时容忍性",
+      "description": "发送可能触发长处理的参数，验证超时机制",
+      "method": "tools/call",
+      "params_template": {"name": "{first_tool}", "arguments": {"query": "{nested_100x}"}},
+      "expected": {"no_crash": true},
+      "timeout": 15
+    }
+  ]
+}
