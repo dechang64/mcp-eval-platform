@@ -64,6 +64,15 @@
       "expected": {"prompts": "array"},
       "optional": true,
       "timeout": 10
+    },
+    {
+      "id": "FN-008",
+      "name": "Protocol Version Declaration",
+      "description": "Server must declare a protocol version from the known spec set (2024-11-05 ... 2026-07-28). See docs/standards-survey.md",
+      "method": "spec/version_declaration",
+      "params": {},
+      "expected": {"declared_version": "in_known_set"},
+      "timeout": 10
     }
   ],
   "performance": [
@@ -142,6 +151,24 @@
       "description": "Send arguments that may trigger long processing, verify timeout handling",
       "method": "tools/call",
       "params_template": {"name": "{first_tool}", "arguments": {"query": "{nested_100x}"}},
+      "expected": {"no_crash": true},
+      "timeout": 15
+    },
+    {
+      "id": "SEC-006",
+      "name": "Request Replay Tolerance",
+      "description": "Send identical tool calls 3 times in a row; the server must not degrade or drop the connection (prominent attack surface since the stateless-core 2026-07-28 spec)",
+      "method": "security/replay",
+      "params_template": {"name": "{first_tool}", "arguments": {}},
+      "expected": {"no_crash": true},
+      "timeout": 15
+    },
+    {
+      "id": "SEC-007",
+      "name": "Metadata Injection",
+      "description": "Inject adversarial per-request metadata (XSS in clientInfo, path traversal, SQL fragments) into tool arguments; server must not crash",
+      "method": "security/metadata_injection",
+      "params_template": {"name": "{first_tool}", "arguments": {"data": "{long_string_10k}"}},
       "expected": {"no_crash": true},
       "timeout": 15
     }

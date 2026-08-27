@@ -186,3 +186,34 @@ class McpClient:
 
     async def __aexit__(self, *args):
         await self.close()
+
+
+# ── Protocol version awareness (spec 2024-11-05 → 2026-07-28) ──
+# Reference: docs/standards-survey.md §1
+
+KNOWN_PROTOCOL_VERSIONS = [
+    "2024-11-05",   # original release: stdio + HTTP+SSE
+    "2025-03-26",   # tool result domains, completion
+    "2025-06-18",   # OAuth 2.1, Streamable HTTP, structured tool output
+    "2025-11-25",   # tasks, elicitation, resource cache control
+    "2026-07-28",   # stateless core: handshake & sessions removed
+]
+
+STATELESS_CORE_VERSION = "2026-07-28"  # first revision without initialize handshake
+
+
+def version_generation(protocol_version: str) -> str:
+    """Classify a declared protocol version into a generation.
+
+    Returns:
+        "stateless" — 2026-07-28+: no initialize handshake, per-request metadata
+        "session"   — 2024-11-05 .. 2025-11-25: initialize/initialized handshake
+        "unknown"   — unrecognized version string
+    """
+    if not protocol_version:
+        return "unknown"
+    if protocol_version not in KNOWN_PROTOCOL_VERSIONS:
+        return "unknown"
+    if protocol_version >= STATELESS_CORE_VERSION:
+        return "stateless"
+    return "session"

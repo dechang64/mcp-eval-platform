@@ -137,12 +137,75 @@ async def run_functional_case(client: McpClient, case: dict, tools: list[ToolInf
             if info.get("error"):
                 return CaseResult(cid, name, "functional", "failed", (time.time()-start)*1000,
                                   {}, f"Connect error: {info['error']}")
+            # Protocol-version-aware (spec 2026-07-28 removed the handshake;
+            # for stateless servers the handshake absence is compliant, not a failure)
+            from core.mcp_client import version_generation, KNOWN_PROTOCOL_VERSIONS
+            gen = version_generation(info.get("protocol_version", ""))
             passed, msg = True, ""
             if "protocol_version" in case.get("expected", {}):
                 if not info.get("protocol_version"):
-                    passed, msg = False, "No protocol_version"
+                    if gen == "stateless":
+                        # Stateles-core server: handshake removed by design (2026-07-28)
+                        passed, msg = True, "stateless core: no handshake (compliant with 2026-07-28)"
+                    else:
+                        passed, msg = False, "No protocol_version"
+                else:
+                    msg = f"protocol_version={info['protocol_version']} ({gen})"
             return CaseResult(cid, name, "functional", "passed" if passed else "failed",
-                              (time.time()-start)*1000, info, msg)
+                              (time.time()-start)*1000, {**info, "generation": gen}, msg)
+
+        elif method == "spec/version_declaration":
+            # FN-008: server must declare a protocol version from the known set
+            from core.mcp_client import version_generation, KNOWN_PROTOCOL_VERSIONS
+            info = client._server_info
+            pv = info.get("protocol_version", "")
+            gen = version_generation(pv)
+            detail = {"declared_version": pv, "generation": gen,
+                      "known_versions": KNOWN_PROTOCOL_VERSIONS}
+            if gen == "unknown":
+                passed, msg = False, f"Unknown protocol version: '{pv}'"
+            else:
+                passed, msg = True, f"declares {pv} ({gen} generation)"
+            return CaseResult(cid, name, "functional", "passed" if passed else "failed",
+                              (time.time()-start)*1000, detail, msg)
+
+        elif method == "security/replay":
+            # SEC-006: repeated identical requests must not crash the server
+            # (stateless-core 2026-07-28 makes replay surfaces prominent)
+            params = resolve_template(case.get("params_template") or {}, tools)
+            tool_name = params.get("name", "")
+            arguments = params.get("arguments", {})
+            tool_name, arguments = pick_callable_tool(tools)
+            errors = 0
+            for _ in range(3):
+                result = await client.call_tool(tool_name, arguments, timeout=timeout)
+                if result.is_error and not result.content:
+                    errors += 1
+            detail = {"tool": tool_name, "replays": 3, "empty_error_responses": errors}
+            passed = errors == 0
+            return CaseResult(cid, name, "security", "passed" if passed else "failed",
+                              (time.time()-start)*1000, detail,
+                              "" if passed else "server degraded under replay")
+
+        elif method == "security/metadata_injection":
+            # SEC-007: oversized/malformed metadata-ish payloads must not crash
+            # (per-request client metadata is a 2026-07-28 feature; adversarial
+            #  values simulate poisoned metadata reaching the server)
+            params = resolve_template(case.get("params_template") or {}, tools)
+            payload = {
+                "__meta": params.get("arguments", {}).get("data", ""),
+                "clientInfo": {"name": "<script>alert(1)</script>", "version": "../../etc/passwd"},
+                "session_id": "'; DROP TABLE sessions; --",
+            }
+            tool_name, arguments = pick_callable_tool(tools)
+            arguments = {**arguments, **payload}
+            result = await client.call_tool(tool_name, arguments, timeout=timeout)
+            crash = result.is_error and not result.content
+            detail = {"tool": tool_name, "injected_keys": list(payload.keys())}
+            passed = not crash
+            return CaseResult(cid, name, "security", "passed" if passed else "failed",
+                              (time.time()-start)*1000, detail,
+                              "" if passed else "server crashed on metadata injection")
 
         elif method == "tools/list":
             tlist = await client.list_tools()
@@ -294,7 +357,16 @@ async def run_performance_case(client: McpClient, case: dict, tools: list[ToolIn
         first_half = statistics.mean(latencies[:mid]) if mid > 0 else 0
         second_half = statistics.mean(latencies[mid:]) if mid > 0 else 0
         detail["trend"] = "degrading" if second_half > first_half * 1.5 else "stable"
-        status = "passed" if errors == 0 and detail["max_min_ratio"] < 5 else "failed"
+        # Stability threshold: max/min ratio < 5. On sub-millisecond servers a single
+        # scheduler jitter event (e.g. 0.3ms -> 1.8ms) inflates the ratio without any
+        # practical instability, so the threshold scales down with absolute latency.
+        if detail["mean_ms"] < 1:
+            ratio_limit = 20      # sub-ms: jitter dominates, absolute delta is tiny
+        elif detail["mean_ms"] < 10:
+            ratio_limit = 10
+        else:
+            ratio_limit = 5
+        status = "passed" if errors == 0 and detail["max_min_ratio"] < ratio_limit else "failed"
         return CaseResult(cid, name, "performance", status, (time.time()-start)*1000, detail)
 
     else:

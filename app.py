@@ -25,6 +25,7 @@ page = st.sidebar.radio("Navigation", [
     "▶️ Test Runs",
     "🤖 LLM Compatibility",
     "🎬 Scenario Testing",
+    "📐 Spec Conformance",
     "📝 Reports",
     "🔄 Comparison",
 ])
@@ -41,6 +42,8 @@ elif page == "🤖 LLM Compatibility":
     from modules.llm_compat_page import render
 elif page == "🎬 Scenario Testing":
     from modules.scenarios_page import render
+elif page == "📐 Spec Conformance":
+    from modules.conformance import render
 elif page == "📝 Reports":
     from modules.reports import render
 elif page == "🔄 Comparison":
