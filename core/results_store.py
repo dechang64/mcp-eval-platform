@@ -62,6 +62,60 @@ def init_db():
 
     CREATE INDEX IF NOT EXISTS idx_results_run ON test_results(run_id);
     CREATE INDEX IF NOT EXISTS idx_runs_server ON test_runs(server_id);
+
+    CREATE TABLE IF NOT EXISTS llm_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_id INTEGER NOT NULL,
+        server_name TEXT NOT NULL,
+        model TEXT DEFAULT 'glm-4-plus',
+        total INTEGER DEFAULT 0,
+        tool_correct INTEGER DEFAULT 0,
+        args_valid INTEGER DEFAULT 0,
+        tool_accuracy REAL DEFAULT 0,
+        args_valid_rate REAL DEFAULT 0,
+        overall REAL DEFAULT 0,
+        grade TEXT DEFAULT '',
+        created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS llm_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        tool_name TEXT, task TEXT, llm_tool TEXT,
+        tool_correct INTEGER DEFAULT 0,
+        llm_args_json TEXT DEFAULT '{}',
+        args_valid INTEGER DEFAULT 0,
+        args_error TEXT DEFAULT '',
+        duration_ms REAL DEFAULT 0,
+        FOREIGN KEY(run_id) REFERENCES llm_runs(id)
+    );
+    CREATE TABLE IF NOT EXISTS scenario_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_id INTEGER,
+        server_name TEXT,
+        total INTEGER, passed INTEGER,
+        details_json TEXT,
+        created_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS agent_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_id INTEGER,
+        server_name TEXT,
+        task_name TEXT,
+        completed INTEGER,
+        rounds INTEGER,
+        steps_json TEXT,
+        grade TEXT,
+        created_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS spec_conformance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_id INTEGER,
+        server_name TEXT,
+        protocol_version TEXT,
+        generation TEXT,
+        capabilities_json TEXT,
+        probed_at TEXT
+    );
     """)
     conn.commit()
     conn.close()

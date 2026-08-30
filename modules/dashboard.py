@@ -18,22 +18,29 @@ def render():
     pass_rate = (stats["passed_cases"] / stats["total_cases"] * 100) if stats["total_cases"] > 0 else 0
     col4.metric("Case Pass Rate", f"{pass_rate:.1f}%")
 
-    # Row 2: cross-dimension KPIs
-    conn = get_db()
-    llm_runs = conn.execute("SELECT COUNT(*) c, AVG(tool_accuracy) acc FROM llm_runs").fetchone()
-    llm_results = conn.execute("""
-        SELECT COUNT(*) total, SUM(tool_correct) tool_ok FROM llm_results""").fetchone()
-    scen_runs = conn.execute("SELECT COUNT(*) c FROM scenario_runs").fetchone()
-    agent_runs = conn.execute("SELECT COUNT(*) c, SUM(completed) done FROM agent_runs").fetchone()
-    conn.close()
+    # Row 2: cross-dimension KPIs (defensive: schema drift must never blank the dashboard)
+    try:
+        conn = get_db()
+        llm_runs = conn.execute("SELECT COUNT(*) c, AVG(tool_accuracy) acc FROM llm_runs").fetchone()
+        llm_results = conn.execute("""
+            SELECT COUNT(*) total, SUM(tool_correct) tool_ok FROM llm_results""").fetchone()
+        scen_runs = conn.execute("SELECT COUNT(*) c FROM scenario_runs").fetchone()
+        agent_runs = conn.execute("SELECT COUNT(*) c, SUM(completed) done FROM agent_runs").fetchone()
+        conn.close()
+        llm_runs_c = llm_runs["c"] or 0
+        tool_ok, tool_total = llm_results["tool_ok"] or 0, llm_results["total"] or 0
+        scen_c = scen_runs["c"] or 0
+        agent_done, agent_c = agent_runs["done"] or 0, agent_runs["c"] or 0
+    except Exception:
+        llm_runs_c = tool_ok = tool_total = scen_c = agent_done = agent_c = 0
 
     col5, col6, col7, col8 = st.columns(4)
-    col5.metric("LLM Compat Runs", llm_runs["c"] or 0,
-                f"{(llm_results['tool_ok'] or 0)}/{llm_results['total'] or 0} tool selections correct" if llm_results["total"] else None)
-    tool_acc = (llm_results["tool_ok"] / llm_results["total"] * 100) if llm_results["total"] else 0
+    col5.metric("LLM Compat Runs", llm_runs_c,
+                f"{tool_ok}/{tool_total} tool selections correct" if tool_total else None)
+    tool_acc = (tool_ok / tool_total * 100) if tool_total else 0
     col6.metric("Tool Selection Accuracy", f"{tool_acc:.0f}%")
-    col7.metric("Scenario Runs", scen_runs["c"] or 0)
-    col8.metric("Agent Tasks Completed", f"{agent_runs['done'] or 0}/{agent_runs['c'] or 0}")
+    col7.metric("Scenario Runs", scen_c)
+    col8.metric("Agent Tasks Completed", f"{agent_done}/{agent_c}")
 
     st.divider()
 
