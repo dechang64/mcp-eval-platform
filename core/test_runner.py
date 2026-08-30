@@ -406,8 +406,10 @@ async def run_security_case(client: McpClient, case: dict, tools: list[ToolInfo]
                   "is_error": result.is_error,
                   "content_preview": str(result.content[0])[:200] if result.content else ""}
         # Check if server is still alive by listing tools
+        # (timeout-guarded: a server that died mid-suite must fail the check,
+        #  not hang the whole evaluation)
         try:
-            await client.list_tools()
+            await asyncio.wait_for(client.list_tools(), timeout=10)
             still_alive = True
         except Exception:
             still_alive = False
@@ -420,7 +422,7 @@ async def run_security_case(client: McpClient, case: dict, tools: list[ToolInfo]
     except Exception as e:
         # If timeout but server still alive = pass (it handled the malicious input)
         try:
-            await client.list_tools()
+            await asyncio.wait_for(client.list_tools(), timeout=10)
             return CaseResult(cid, name, "security", "passed", (time.time()-start)*1000,
                               {"timeout": True}, f"Handled gracefully (timeout): {e}")
         except Exception:
