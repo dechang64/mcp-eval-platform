@@ -77,19 +77,21 @@ def check_expected(result, expected: dict, tool_name: str = "") -> tuple[bool, s
     if not expected:
         return True, ""
 
-    # no_crash: passes as long as the server did not disconnect
-    if expected.get("no_crash") and result is not None:
-        return True, ""
-
     if result is None:
         return False, "No response (server may have crashed)"
 
-    # Check is_error
+    # Check is_error semantics FIRST: no_crash means "stayed connected",
+    # not "anything goes" - a server that answers wrong must still fail
     if "is_error" in expected:
         expected_err = expected["is_error"]
         actual_err = getattr(result, "is_error", False)
         if actual_err != expected_err:
             return False, f"is_error mismatch: expected {expected_err}, got {actual_err}"
+
+    # no_crash: passes as long as the server did not disconnect
+    if expected.get("no_crash"):
+        return True, ""
+
 
     # Check content exists
     if expected.get("content") == "exists":
@@ -224,16 +226,21 @@ async def run_functional_case(client: McpClient, case: dict, tools: list[ToolInf
                 tool_name = "__nonexistent_tool_xyz__"
                 arguments = {}
             else:
-                # Check if the tool has required params not satisfied by arguments
-                tool_info = next((t for t in tools if t.name == tool_name), None)
-                if tool_info:
-                    required = (tool_info.input_schema or {}).get("required", [])
-                    missing = [r for r in required if r not in arguments]
-                    if missing:
-                        # Use pick_callable_tool to find a better one
-                        ct_name, ct_args = pick_callable_tool(tools)
-                        if ct_name != "unknown":
-                            tool_name, arguments = ct_name, ct_args
+                # Error-semantics cases (expected is_error=True) must send the
+                # template arguments EXACTLY as specified - the invalidity IS
+                # the test. Never substitute callable defaults here.
+                expects_error = bool(case.get("expected", {}).get("is_error"))
+                if not expects_error:
+                    # Check if the tool has required params not satisfied by arguments
+                    tool_info = next((t for t in tools if t.name == tool_name), None)
+                    if tool_info:
+                        required = (tool_info.input_schema or {}).get("required", [])
+                        missing = [r for r in required if r not in arguments]
+                        if missing:
+                            # Use pick_callable_tool to find a better one
+                            ct_name, ct_args = pick_callable_tool(tools)
+                            if ct_name != "unknown":
+                                tool_name, arguments = ct_name, ct_args
                 elif not tool_name or tool_name == "unknown":
                     tool_name, arguments = pick_callable_tool(tools)
             result = await client.call_tool(tool_name, arguments, timeout=timeout)
