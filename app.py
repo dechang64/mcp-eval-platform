@@ -14,6 +14,32 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
+def _check_password() -> bool:
+    """Access gate. When APP_PASSWORD is set in st.secrets, the whole app is
+    locked until the password is entered (once per session). If it is not
+    configured (local dev), the gate is open."""
+    if st.session_state.get("password_ok"):
+        return True
+    try:
+        app_password = st.secrets.get("APP_PASSWORD", "")
+    except Exception:
+        app_password = ""
+    if not app_password:
+        return True
+    st.title("🔧 MCP Evaluation Platform")
+    st.caption("Model Context Protocol Server Evaluation")
+    with st.form("access_gate"):
+        pwd = st.text_input("Access password", type="password")
+        if st.form_submit_button("Unlock"):
+            if pwd and pwd == app_password:
+                st.session_state.password_ok = True
+                st.rerun()
+            else:
+                st.error("Incorrect password")
+    return False
+
+
 # Sidebar navigation
 st.sidebar.title("MCP Evaluation Platform")
 st.sidebar.caption("Model Context Protocol Server Evaluation")
@@ -49,4 +75,5 @@ elif page == "📝 Reports":
 elif page == "🔄 Comparison":
     from modules.compare import render
 
-render()
+if _check_password():
+    render()
