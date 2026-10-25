@@ -1,16 +1,95 @@
 """MCP client wrapper - supports both stdio and SSE transports"""
 import asyncio
+import ipaddress
 import json
 import os
+import socket
 import sys
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.sse import sse_client
+
+
+# ── SSE URL validation (SSRF guard) ───────────────────────
+# Only plain http/https URLs whose host resolves to a public address are
+# allowed. Blocks cloud metadata endpoints (169.254.169.254), loopback,
+# link-local, and all RFC-1918 private ranges — both IPv4 and IPv6.
+
+_BLOCKED_NETWORKS = tuple(
+    ipaddress.ip_network(c)
+    for c in (
+        "0.0.0.0/8",        # "this host"
+        "10.0.0.0/8",       # private
+        "127.0.0.0/8",      # loopback
+        "169.254.0.0/16",   # link-local (cloud metadata!)
+        "172.16.0.0/12",    # private
+        "192.168.0.0/16",   # private
+        "::1/128",          # IPv6 loopback
+        "fe80::/10",        # IPv6 link-local
+        "fc00::/7",         # IPv6 unique-local
+    )
+)
+
+_BLOCKED_HOSTNAMES = ("localhost",)
+
+
+def _ip_is_blocked(ip: ipaddress._BaseAddress) -> bool:
+    return any(ip in net for net in _BLOCKED_NETWORKS)
+
+
+def validate_sse_url(url: str) -> None:
+    """Validate an SSE URL before any connection is attempted.
+
+    Raises:
+        ValueError: scheme is not http/https, the host is localhost, or the
+        host (literal or resolved) is in a blocked private/reserved range.
+    """
+    try:
+        parsed = urlparse(url)
+    except Exception as e:
+        raise ValueError(f"invalid URL {url!r}: {e}")
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"scheme not allowed: {parsed.scheme!r} (only http/https)")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("URL has no host")
+    host_l = host.lower()
+    if host_l in _BLOCKED_HOSTNAMES or host_l.endswith(".localhost"):
+        raise ValueError("hostname not allowed: localhost")
+
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        ip = None
+    if ip is not None:
+        if _ip_is_blocked(ip):
+            raise ValueError(f"IP {host} is in a blocked private/reserved range")
+        return
+
+    # Hostname: resolve and require every resolved address to be public.
+    try:
+        infos = socket.getaddrinfo(
+            host, parsed.port or (443 if parsed.scheme == "https" else 80),
+            type=socket.SOCK_STREAM,
+        )
+    except OSError as e:
+        raise ValueError(f"cannot resolve host {host!r}: {e}")
+    addrs = {info[4][0] for info in infos}
+    if not addrs:
+        raise ValueError(f"host {host!r} resolved to no addresses")
+    for a in addrs:
+        try:
+            ip = ipaddress.ip_address(a)
+        except ValueError:
+            continue
+        if _ip_is_blocked(ip):
+            raise ValueError(f"host {host!r} resolves to blocked address {a}")
 
 
 @dataclass
@@ -89,6 +168,7 @@ class McpClient:
                 self._ctx = stdio_client(params)
                 read, write = await self._ctx.__aenter__()
             elif self.config.transport == "sse":
+                validate_sse_url(self.config.url)
                 self._ctx = sse_client(self.config.url)
                 read, write = await self._ctx.__aenter__()
             else:

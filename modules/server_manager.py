@@ -93,6 +93,12 @@ def render():
                                     config["env"][k] = v
                         config["url"] = ""
                     else:
+                        from core.mcp_client import validate_sse_url
+                        try:
+                            validate_sse_url(url)
+                        except ValueError as e:
+                            st.error(f"Invalid SSE URL: {e}")
+                            st.stop()
                         config["command"] = ""
                         config["args"] = []
                         config["env"] = {}
