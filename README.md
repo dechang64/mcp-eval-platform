@@ -7,7 +7,7 @@ A comprehensive evaluation platform for MCP (Model Context Protocol) servers, co
 | **Functional** | 8 | Handshake (protocol-version aware), tool listing, valid/invalid arguments, nonexistent tools, optional capabilities (resources/prompts), protocol version declaration |
 | **Performance** | 3 | Call latency (p50/p95/p99), concurrent throughput (RPS at 1/5/10), sustained-call stability |
 | **Security** | 7 | SQL injection, path traversal, oversized payloads, special characters, timeout tolerance, request replay, metadata injection (no-crash) |
-| **LLM Compatibility** | per-tool | A real LLM (glm-4-plus) reads tool descriptions and must pick the right tool and fill schema-valid arguments |
+| **LLM Compatibility** | per-tool | A real LLM (configurable; defaults to `qwen3.5-flash-nothinking` via AMAX) reads tool descriptions and must pick the right tool and fill schema-valid arguments |
 | **Scenario Testing** | 6 | Multi-tool workflows with state passing (write → read → delete → verify), audit consistency, persistence round-trips, plus an LLM Agent loop for composite task planning |
 
 Scores are aggregated into an **A+ to D grade** (functional 40% + performance 30% + security 30%).
@@ -57,6 +57,52 @@ Transport:   stdio
 Command:     npx
 Arguments:   -y @modelcontextprotocol/server-filesystem /path/to/dir
 ```
+
+## Deploy to Streamlit Cloud
+
+The platform can be hosted on [Streamlit Community Cloud](https://share.streamlit.io)
+for classroom demos and report viewing. The `cloud-deploy` branch carries the
+hardening required for public exposure (access gate, registration lock-down,
+SSRF URL validation, LLM daily budget, temp-dir SQLite).
+
+### Steps
+
+1. Fork/push this repo and select the **`cloud-deploy`** branch in
+   "New app → Advanced settings → Branch".
+2. Add the secrets below in the app's **Settings → Secrets** panel (all values
+   are placeholders — never commit real secrets):
+   ```toml
+   APP_PASSWORD = "choose-a-strong-password"      # access gate; omit to disable
+   AMAX_API_KEY = "paste-your-amax-api-key-here"  # required for LLM features
+   AMAX_BASE_URL = "https://ai.amaxsmp.com/v1"    # optional override
+   AMAX_MODEL = "qwen3.5-flash-nothinking"        # optional override
+   LLM_DAILY_BUDGET_RUNS = "200"                  # optional; default 200/day
+   MCP_EVAL_CLOUD = "1"                           # lock-down mode (see below)
+   ```
+   A template lives at [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example);
+   copy it to `.streamlit/secrets.toml` for local testing. The real
+   `secrets.toml` is git-ignored — never commit it.
+3. Deploy. In cloud mode (`MCP_EVAL_CLOUD=1` via env or secrets):
+   - the **Register MCP Server** form is hidden and only three **preset
+     servers** are listed — the bundled `test_server.py` plus the Lab 4
+     `server_a.py` / `server_b.py` SSE endpoints;
+   - every SSE URL is validated: only `http(s)` to public addresses
+     (private/loopback/link-local ranges and `localhost` are rejected);
+   - LLM-backed runs (LLM Compatibility, Agent Loop) count against the daily
+     budget and are refused with a friendly message once exhausted;
+   - the SQLite DB lives in the container temp dir (`MCP_EVAL_DB` env var to
+     override), so **cloud data is ephemeral — download reports promptly** and
+     expect a fresh state after every reboot/redeploy.
+
+### Course-window suggestions
+
+- Rotate `APP_PASSWORD` weekly and share it only during class.
+- Raise `LLM_DAILY_BUDGET_RUNS` (e.g. 500) for the Lab 4 week; keep it small
+  (e.g. 50) for off-week demos.
+- **Lab 4 formal evaluation should still run the platform locally**
+  (`streamlit run app.py`) with students' own servers — the cloud instance is a
+  demo/report viewer, since cloud containers cannot reach student laptops.
+  Use the cloud instance for pre-class demos and for reviewing saved reports.
 
 ## Benchmark Highlights
 
