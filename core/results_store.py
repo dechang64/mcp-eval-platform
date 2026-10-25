@@ -2,14 +2,26 @@
 import json
 import sqlite3
 import os
+import tempfile
 from datetime import datetime
 from typing import Optional
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "mcp_eval.db")
+# Cloud-friendly DB path: env override first, else the system temp dir.
+# Streamlit Community Cloud mounts the app directory read-only, so a
+# repo-relative path would crash init_db() at import time.
+DB_PATH = os.environ.get(
+    "MCP_EVAL_DB",
+    os.path.join(tempfile.gettempdir(), "mcp_eval.db"),
+)
 
 
 def get_db() -> sqlite3.Connection:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+        except OSError:
+            pass  # e.g. read-only parent; sqlite will surface a clear error
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -272,5 +284,10 @@ def get_dashboard_stats() -> dict:
     }
 
 
-# Initialize on import
-init_db()
+# Initialize on import. Never crash the whole app if the DB directory is not
+# writable (e.g. misconfigured read-only mount) — pages degrade gracefully.
+try:
+    init_db()
+except OSError as _e:
+    import sys as _sys
+    print(f"WARNING: results_store init failed: {_e}", file=_sys.stderr)
