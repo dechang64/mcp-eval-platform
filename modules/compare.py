@@ -183,4 +183,4 @@ def render():
     except Exception as e:
         st.caption(f"Chart unavailable: {e}")
 
-    st.caption("Note: scenario pass rate counts applicable scenarios only (skipped scenarios are excluded from the denominator when the tool family does not match). LLM compatibility uses the latest run with glm-4-plus.")
+    st.caption("Note: scenario pass rate counts applicable scenarios only (skipped scenarios are excluded from the denominator when the tool family does not match). LLM compatibility uses the latest LLM compatibility run.")

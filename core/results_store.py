@@ -79,7 +79,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         server_id INTEGER NOT NULL,
         server_name TEXT NOT NULL,
-        model TEXT DEFAULT 'glm-4-plus',
+        model TEXT DEFAULT 'qwen3.5-flash-nothinking',
         total INTEGER DEFAULT 0,
         tool_correct INTEGER DEFAULT 0,
         args_valid INTEGER DEFAULT 0,

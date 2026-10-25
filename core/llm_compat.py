@@ -8,46 +8,97 @@ Flow: connect to the server under test and fetch its tool list →
       the LLM generates one natural-language task per tool →
       the LLM (seeing the tool catalog + task) picks a tool and fills args →
       a rule engine validates both.
+
+LLM backend: AMAX (OpenAI-compatible chat completions). Configuration is
+read lazily at call time — env vars first, then Streamlit secrets:
+  AMAX_API_KEY   (required)  secret key
+  AMAX_BASE_URL  (optional)  default https://ai.amaxsmp.com/v1
+  AMAX_MODEL     (optional)  default see DEFAULT_MODEL below
 """
 import asyncio
 import json
+import os
 import re
-import subprocess
 import time
 from dataclasses import dataclass, field
 from typing import Optional
 
+DEFAULT_MODEL = "qwen3.5-flash-nothinking"
+DEFAULT_BASE_URL = "https://ai.amaxsmp.com/v1"
 
-# ── z-ai CLI wrapper ───────────────────────────────────────
+
+def get_llm_model() -> str:
+    """Resolve the model name: AMAX_MODEL env / secrets, else the default."""
+    model = os.environ.get("AMAX_MODEL", "")
+    if not model:
+        try:
+            import streamlit as st
+            model = st.secrets.get("AMAX_MODEL", "")
+        except Exception:
+            model = ""
+    return model or DEFAULT_MODEL
+
+
+# ── AMAX backend (OpenAI-compatible) ─────────────────────
 
 def llm_call(prompt: str, system: str = "", retries: int = 3) -> str:
-    """Call the z-ai CLI and return the plain-text reply. Auto-backoff on 429."""
-    cmd = ["z-ai", "chat", "-p", prompt]
+    """Call the AMAX OpenAI-compatible API and return the plain-text reply.
+
+    Retry semantics (preserved from the previous z-ai CLI implementation):
+      - 429 / rate-limit → exponential backoff 8 * (attempt + 1) seconds
+      - any other error  → 3s backoff
+    Both give up after `retries` attempts and raise. The last 429 now
+    surfaces a real error instead of falling through to "unreachable".
+    Client-side timeout: 60s per call.
+    """
+    import openai
+
+    api_key = os.environ.get("AMAX_API_KEY", "")
+    base_url = os.environ.get("AMAX_BASE_URL", "")
+    model = os.environ.get("AMAX_MODEL", "")
+    try:
+        import streamlit as st
+        api_key = api_key or st.secrets.get("AMAX_API_KEY", "")
+        base_url = base_url or st.secrets.get("AMAX_BASE_URL", "")
+        model = model or st.secrets.get("AMAX_MODEL", "")
+    except Exception:
+        pass  # outside Streamlit runtime (tests, scripts) — env only
+    if not api_key:
+        raise RuntimeError("AMAX_API_KEY not configured (Streamlit secret or env var)")
+    base_url = base_url or DEFAULT_BASE_URL
+    model = model or DEFAULT_MODEL
+
+    client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=60)
+    messages = []
     if system:
-        cmd += ["-s", system]
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
     for attempt in range(retries):
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            out = proc.stdout
-            # Filter init lines, parse JSON
-            lines = [l for l in out.splitlines() if not l.startswith("🚀")]
-            data = json.loads("\n".join(lines))
-            return data["choices"][0]["message"]["content"]
-        except subprocess.TimeoutExpired:
-            if attempt == retries - 1:
-                raise RuntimeError("z-ai CLI timeout")
-            time.sleep(5)
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
-            if attempt == retries - 1:
-                raise RuntimeError(f"z-ai output parse failed: {e}: {out[:200]}")
-            time.sleep(3)
+            resp = client.chat.completions.create(model=model, messages=messages)
+            content = resp.choices[0].message.content
+            if isinstance(content, str):
+                return content
+            # Multimodal replies: concatenate text blocks
+            return "".join(getattr(b, "text", "") for b in content)
         except Exception as e:
-            if "429" in str(e) or "rate" in str(e).lower():
-                time.sleep(8 * (attempt + 1))
-            elif attempt == retries - 1:
-                raise
-            else:
+            is_rate_limit = (
+                getattr(e, "status_code", None) == 429
+                or "429" in str(e)
+                or "rate" in str(e).lower()
+            )
+            if is_rate_limit:
+                if attempt < retries - 1:
+                    time.sleep(8 * (attempt + 1))
+                    continue
+                raise RuntimeError(
+                    f"AMAX rate limit (429) persists after {retries} attempts: {e}"
+                ) from e
+            if attempt < retries - 1:
                 time.sleep(3)
+                continue
+            raise
     raise RuntimeError("unreachable")
 
 

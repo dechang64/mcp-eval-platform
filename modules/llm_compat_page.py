@@ -18,7 +18,7 @@ def render():
     from modules.utils import fmt_timestamp
 
     st.header("🤖 LLM Compatibility")
-    st.caption("A real LLM reads tool descriptions and executes tasks — measuring how \"LLM-legible\" the server is. Requires z-ai CLI + glm-4-plus.")
+    st.caption("A real LLM reads tool descriptions and executes tasks - measuring how \"LLM-legible\" the server is. Powered by an LLM via the AMAX OpenAI-compatible API.")
 
     # Init llm tables
     _init_llm_tables()
@@ -77,7 +77,7 @@ def _init_llm_tables():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         server_id INTEGER NOT NULL,
         server_name TEXT NOT NULL,
-        model TEXT DEFAULT 'glm-4-plus',
+        model TEXT DEFAULT 'qwen3.5-flash-nothinking',
         total INTEGER DEFAULT 0,
         tool_correct INTEGER DEFAULT 0,
         args_valid INTEGER DEFAULT 0,
@@ -190,9 +190,10 @@ Output JSON only: {{"tool": "tool_name", "arguments": {{...}}}}"""
 
         conn = get_db()
         now = datetime.now().isoformat()
+        from core.llm_compat import get_llm_model
         cur = conn.execute(
             "INSERT INTO llm_runs (server_id, server_name, model, total, tool_correct, args_valid, tool_accuracy, args_valid_rate, overall, grade, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (server["id"], server["name"], "glm-4-plus", s.total,
+            (server["id"], server["name"], get_llm_model(), s.total,
              sum(1 for r in results if r["tool_correct"]),
              sum(1 for r in results if r["tool_correct"] and r["args_valid"]),
              s.tool_accuracy, s.args_valid_rate, s.overall, s.grade, now),
