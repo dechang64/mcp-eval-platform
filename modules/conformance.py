@@ -74,7 +74,6 @@ def _probe_all(servers):
 
 
 def _render_matrix():
-    import pandas as pd
     from core.results_store import get_db
     from core.mcp_client import KNOWN_PROTOCOL_VERSIONS, STATELESS_CORE_VERSION
 
