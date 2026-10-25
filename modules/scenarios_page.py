@@ -142,6 +142,14 @@ def _run_agent(server, task_def, max_rounds):
     import streamlit as st
     from core.mcp_client import McpClient, McpServerConfig
     from core.agent_loop import run_agent_loop
+    from core.results_store import increment_llm_runs_today
+    from modules.utils import llm_budget_check
+
+    exceeded, used, budget = llm_budget_check()
+    if exceeded:
+        st.warning(f"Daily LLM evaluation budget reached ({used}/{budget} runs). Please try again tomorrow.")
+        return
+    increment_llm_runs_today()
 
     progress = st.progress(0, text="Agent planning...")
     cfg = McpServerConfig.from_dict(json.loads(server["config_json"]))

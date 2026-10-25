@@ -43,3 +43,15 @@ def run_async(coro):
 def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def llm_budget_check() -> tuple:
+    """Daily LLM run budget gate.
+
+    Returns (exceeded, used, budget). The budget defaults to 200 runs/day
+    and is configurable via the LLM_DAILY_BUDGET_RUNS env var (or secrets).
+    """
+    from core.results_store import count_llm_runs_today, get_llm_daily_budget
+    budget = get_llm_daily_budget()
+    used = count_llm_runs_today()
+    return (used >= budget, used, budget)

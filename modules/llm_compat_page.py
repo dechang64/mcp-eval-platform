@@ -106,12 +106,18 @@ def _init_llm_tables():
 def _run_llm_compat(server: dict, max_tools: int):
     from core.mcp_client import McpClient, McpServerConfig
     from core.llm_compat import generate_tasks, run_selection, summarize
-    from core.results_store import get_db
-    from modules.utils import run_async
+    from core.results_store import get_db, increment_llm_runs_today
+    from modules.utils import run_async, llm_budget_check
     from datetime import datetime
 
     progress = st.progress(0, text="Connecting to MCP Server...")
     try:
+        exceeded, used, budget = llm_budget_check()
+        if exceeded:
+            progress.progress(100, text="Daily LLM budget exhausted")
+            st.warning(f"Daily LLM evaluation budget reached ({used}/{budget} runs). Please try again tomorrow.")
+            return
+        increment_llm_runs_today()
         cfg = McpServerConfig.from_dict(json.loads(server["config_json"]))
         client = McpClient(cfg)
         run_async(client.connect())

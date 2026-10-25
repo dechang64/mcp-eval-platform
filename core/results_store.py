@@ -100,6 +100,10 @@ def init_db():
         duration_ms REAL DEFAULT 0,
         FOREIGN KEY(run_id) REFERENCES llm_runs(id)
     );
+    CREATE TABLE IF NOT EXISTS llm_daily_usage (
+        day TEXT PRIMARY KEY,
+        run_count INTEGER NOT NULL DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS scenario_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         server_id INTEGER,
@@ -282,6 +286,48 @@ def get_dashboard_stats() -> dict:
         "passed_cases": passed_cases,
         "recent_runs": [dict(r) for r in recent],
     }
+
+
+# ── LLM daily budget ───────────────────────────────────────
+
+def get_llm_daily_budget() -> int:
+    """Max LLM-backed evaluation runs allowed per day (per calendar day, local
+    time). Configurable via the LLM_DAILY_BUDGET_RUNS env var or secrets."""
+    raw = os.environ.get("LLM_DAILY_BUDGET_RUNS", "")
+    if not raw:
+        try:
+            import streamlit as st
+            raw = str(st.secrets.get("LLM_DAILY_BUDGET_RUNS", ""))
+        except Exception:
+            raw = ""
+    try:
+        return max(1, int(raw)) if raw.strip() else 200
+    except ValueError:
+        return 200
+
+
+def count_llm_runs_today() -> int:
+    """How many LLM-backed runs have been started today."""
+    conn = get_db()
+    day = datetime.now().date().isoformat()
+    row = conn.execute("SELECT run_count FROM llm_daily_usage WHERE day=?", (day,)).fetchone()
+    conn.close()
+    return row["run_count"] if row else 0
+
+
+def increment_llm_runs_today(n: int = 1) -> int:
+    """Record LLM run usage; returns the new daily count."""
+    conn = get_db()
+    day = datetime.now().date().isoformat()
+    conn.execute(
+        "INSERT INTO llm_daily_usage (day, run_count) VALUES (?, ?) "
+        "ON CONFLICT(day) DO UPDATE SET run_count = run_count + excluded.run_count",
+        (day, n),
+    )
+    conn.commit()
+    row = conn.execute("SELECT run_count FROM llm_daily_usage WHERE day=?", (day,)).fetchone()
+    conn.close()
+    return row["run_count"]
 
 
 # Initialize on import. Never crash the whole app if the DB directory is not
