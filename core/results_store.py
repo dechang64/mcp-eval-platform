@@ -148,7 +148,14 @@ def get_server(sid: int) -> Optional[dict]:
     return dict(row) if row else None
 
 
+# Whitelist of allowed column names for update_server
+_ALLOWED_SERVER_COLUMNS = {"name", "transport", "config_json", "description", "tags", "updated_at"}
+
 def update_server(sid: int, **fields):
+    # Validate column names to prevent SQL injection
+    bad = set(fields.keys()) - _ALLOWED_SERVER_COLUMNS
+    if bad:
+        raise ValueError(f"Invalid column names: {bad}")
     conn = get_db()
     now = datetime.now().isoformat()
     fields["updated_at"] = now
