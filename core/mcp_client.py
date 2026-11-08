@@ -1,3 +1,4 @@
+from __future__ import annotations
 """MCP client wrapper - supports both stdio and SSE transports"""
 import asyncio
 import json

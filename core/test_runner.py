@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Test execution engine - load cases, execute, collect results"""
 import asyncio
 import json

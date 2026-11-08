@@ -1,3 +1,4 @@
+from __future__ import annotations
 """LLM Compatibility Test Engine
 
 Goal: measure whether an LLM can, given only the MCP server's tool descriptions:

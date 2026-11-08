@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Scoring system - compute overall grade from test results"""
 from dataclasses import dataclass
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """SQLite result store - server configs / test results / run history"""
 import json
 import sqlite3
