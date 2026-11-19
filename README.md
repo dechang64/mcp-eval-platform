@@ -1,6 +1,6 @@
 # MCP Evaluation Platform
 
-A comprehensive evaluation platform for MCP (Model Context Protocol) servers, covering **five dimensions** that go beyond protocol compliance into semantics and behavior:
+A comprehensive evaluation platform for MCP (Model Context Protocol) servers, covering **five platform dimensions** that go beyond protocol compliance into semantics and behaviour:
 
 | Dimension | Cases | What It Verifies |
 |-----------|-------|------------------|
@@ -8,22 +8,40 @@ A comprehensive evaluation platform for MCP (Model Context Protocol) servers, co
 | **Performance** | 3 | Call latency (p50/p95/p99), concurrent throughput (RPS at 1/5/10), sustained-call stability |
 | **Security** | 7 | SQL injection, path traversal, oversized payloads, special characters, timeout tolerance, request replay, metadata injection (no-crash) |
 | **LLM Compatibility** | per-tool | A real LLM (glm-4-plus) reads tool descriptions and must pick the right tool and fill schema-valid arguments |
-| **Scenario Testing** | 6 | Multi-tool workflows with state passing (write → read → delete → verify), audit consistency, persistence round-trips, plus an LLM Agent loop for composite task planning |
+| **Scenario Testing** | 6 | Multi-tool workflows with state passing (write -> read -> delete -> verify), audit consistency, persistence round-trips, plus an LLM Agent loop for composite task planning |
 
 Scores are aggregated into an **A+ to D grade** (functional 40% + performance 30% + security 30%).
 
-## Standards Alignment
+> These five dimensions are the platform's own implementation / teaching taxonomy. They are **not** a standards classification, and they are not the five testing dimensions on ISA104 Lecture 10 slide 8. The 18 standard cases, the A+~D grade and the 40/30/30 weights are lab implementation parameters, not a format prescribed by any standard. Metrics must not be mixed across the model / AI-system / agent-tool layers.
 
-The evaluation methodology is aligned with the latest national and international standards (see [docs/standards-survey.md](docs/standards-survey.md)):
+## Course linkage (ISA104 Lab 5, Track B)
 
-| Platform Dimension | Aligned Standard |
-|--------------------|------------------|
-| Evaluation methodology (dimension-based indicators, objective + model-in-the-loop scoring) | **GB/T 45288.2-2025**《人工智能大模型 第2部分：评测指标与方法》 |
-| Quality characteristics (functional suitability, performance efficiency, reliability, security) | **ISO/IEC 25059:2023** (AI quality model, SQuaRE extension) |
-| Security dimension taxonomy | **GB/T 45654-2025** (Generative AI service security baseline) + TC260《智能体交互安全要求》practice guide |
-| Protocol conformance matrix | **MCP specification timeline** 2024-11-05 → 2026-07-28 (stateless core), version-aware FN-001/FN-008 |
+This repository is the upstream of the bundled student kit in `ISA104_Lab5/5. ISA104_Lab5_TrackB_server_kit/`. ISA104 Lab 5 has two equally weighted routes — Track A evaluates an agent's answers on the XIPU AI Agent platform; **Track B (this platform) evaluates the MCP server its tools depend on**. Either route is worth the same 100 marks; students choose one. The student kit contains its own task sheet, a one-click Windows launcher, and two lab servers; use that kit for teaching rather than asking students to clone this repository during class.
 
-Positioning: existing MCP benchmarks (MCP-Bench, MCP-Universe, MCPMark, MCP-SafetyBench) evaluate **models** with fixed servers; this platform evaluates **servers** with a fixed model — the complementary gap, aligned with GB/T 45288.2 methodology applied at the MCP server layer.
+The hosted demo at `https://mcp-eval.streamlit.app` is **a demo only**. It requires Streamlit authentication and, being a cloud instance, cannot reach `localhost:8101` / `localhost:8102` on a student's machine. Lab 5 must be run locally.
+
+## Standards context (not a compliance claim)
+
+**MCP is an industry protocol, not a standard.** The documents below provide lecture context; none of them certifies this platform, and no graded report is a standards-conformant assessment. Official URLs, full titles and publication statuses are on the Standards Map at the start of ISA104 Lecture 10 and in `ISA104_Lecture10_standards_verification_sheet.docx` (instructor copy). Status: as of 2026-11-16. See [`docs/standards-survey.md`](docs/standards-survey.md) for the full survey.
+
+| Document | What it actually provides | How this platform uses it |
+|---|---|---|
+| ISO/IEC TS 42119-2:2025 (published 2025-11-03) with the ISO/IEC/IEEE 29119 series | Risk-driven AI-system test process | Same general test-process logic: plan -> cases -> execution -> defect lifecycle -> report |
+| ISO/IEC 25059:2023 | AI quality model and terminology; 90.92 under revision, FDIS Ed.2 at approval | Background only. A quality model is not a test method and is not our five-dimension taxonomy |
+| GB/T 45288.2-2025 | LLM testing metrics and methods; Chapter 6 environment -> tools -> execution -> reporting; Section 6.5 covers cross-model validation, human review and stable interfaces | Method reference. The Section 6.2 dataset baseline is known only through **secondary interpretations that disagree** (`>= 200` vs `<= 200` items per capability); verify against the official text before citing. Our 30-row teaching dataset is below any such baseline |
+| GB/T 45654-2025 (issued 2025-04-25, effective 2025-11-01) | Basic security requirements for generative AI services in China; prescribes no report format | Risk-taxonomy context only; a graded MCP report is not an endorsement under this standard |
+| GB/Z 185.6-2026 / GB/Z 185.7-2026 / GB/Z 242-2026 | Agent interaction, agent tool calling (incl. tool-description standardisation), agent technical requirements — national standardisation **guidance** documents | Context for the handshake and tool-description cases; not conformance tests |
+| GB/Z 236-2026 / GB/Z 253-2026 | RAG-related guidance documents | Background for retrieval-adjacent scenarios; not conformance tests |
+| TC260 practice guides | Standards-related technical documents. 'Guidelines for Secure Deployment and Use of Agents' is published; 'Agent Interaction Security Requirements' (2026-07-29) is a **draft for comment** | Read as guidance; never cite the draft as an in-force requirement |
+| NIST AI RMF 1.0 / AI 600-1 | Voluntary framework (GOVERN / MAP / MEASURE / MANAGE) | Vocabulary for risk and continuous monitoring |
+| EU AI Act, Reg (EU) 2024/1689, Art. 9 / 11-12 / 14 / 15(3) | Law | The actual "scores -> evidence" legal chain; not a standard |
+| ISTQB CT-AI v2.0 / CT-GenAI | Certification syllabi | Teaching vocabulary: testing **of** AI vs testing **with** AI; not a standard text |
+
+Official entry points: https://www.iso.org/standard/84127.html , https://www.iso.org/standard/80655.html , https://openstd.samr.gov.cn/ , https://std.samr.gov.cn/ , https://www.tc260.org.cn/ , https://www.nist.gov/itl/ai-risk-management-framework , https://eur-lex.europa.eu/eli/reg/2024/1689/oj , https://modelcontextprotocol.io/
+
+**Positioning:** existing MCP benchmarks (MCP-Bench, MCP-Universe, MCPMark, MCP-SafetyBench) fix the servers and evaluate the **model**; this platform fixes the model and evaluates the **server** (protocol behaviour, performance, robustness, tool-description legibility, cross-tool consistency). The two are complementary. Neither is a standards-conformant assessment.
+
+**On LLM-as-a-Judge:** the LLM-compatibility dimension uses a model for tool selection, not as a scoring judge. Where a judge is used in teaching, five failure modes need playbooks (bias, position, length, self-preference, score drift), the judge version (model snapshot + prompt + rubric) must be frozen with a changelog, and a human-labelled calibration set should be re-checked after any version change. Spearman rho, MAE, "three runs averaged" and any numeric threshold are **engineering heuristics, not standard requirements** — GB/T 45288.2 Section 6.5 sets no such threshold.
 
 ## Architecture
 
@@ -32,6 +50,8 @@ Positioning: existing MCP benchmarks (MCP-Bench, MCP-Universe, MCPMark, MCP-Safe
 - **LLM integration** via z-ai CLI (glm-4-plus) with automatic 429 backoff
 - **Protocol-version awareness**: FN-001 adapts to stateless-core (2026-07-28) servers; Spec Conformance matrix page tracks version/capabilities per server
 - **Markdown report export** for every test run
+
+> **Version-table note.** `core/mcp_client.py` ships `KNOWN_PROTOCOL_VERSIONS` with five implementation entries: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25`, `2026-07-28`. The ISA104 Lecture 10 five-revision **teaching** timeline lists `2024-11-05 -> 2025-03-26 -> 2025-06-18 -> 2025-08-26 -> 2026-07-28`. The fourth entry differs between the code and the slide; both are implementation / teaching data, not a standard, and should be checked against the [official MCP changelog](https://modelcontextprotocol.io/specification/2026-07-28/changelog) before reuse. There is no `2026-03-26` release.
 
 ## Quick Start
 
@@ -58,6 +78,8 @@ Command:     npx
 Arguments:   -y @modelcontextprotocol/server-filesystem /path/to/dir
 ```
 
+For the ISA104 Lab 5 Track B servers, see `lab5/README.md` and the bundled student kit. Run everything on one machine: the platform must be able to reach `localhost:8101` and `localhost:8102`.
+
 ## Benchmark Highlights
 
 Measured on the same host (stdio transport):
@@ -70,6 +92,8 @@ Measured on the same host (stdio transport):
 
 ¹ The LLM confused `read_file` with `read_text_file` — semantic overlap in tool naming, discoverable only through real-model evaluation.
 
+> **Denominator note:** these figures come from a 2026-08 comparative run against the then-current **15-case** suite. Today's standard suite has **18 cases** (functional 8 + performance 3 + security 7), reflected in Lecture 10 and the Lab 5 student kit. These are different runs with different denominators: report the exported results of the actual run and do not rescale them.
+
 ## Defect Discovery Case Studies
 
 The platform found two real defects in the self-developed Rust server (FedCtx), both closed with fix-verify loops:
@@ -79,4 +103,4 @@ The platform found two real defects in the self-developed Rust server (FedCtx), 
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
