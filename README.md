@@ -7,18 +7,43 @@ A comprehensive evaluation platform for MCP (Model Context Protocol) servers, co
 | **Functional** | 8 | Handshake (protocol-version aware), tool listing, valid/invalid arguments, nonexistent tools, optional capabilities (resources/prompts), protocol version declaration |
 | **Performance** | 3 | Call latency (p50/p95/p99), concurrent throughput (RPS at 1/5/10), sustained-call stability |
 | **Security** | 7 | SQL injection, path traversal, oversized payloads, special characters, timeout tolerance, request replay, metadata injection (no-crash) |
-| **LLM Compatibility** | per-tool | A real LLM (glm-4-plus) reads tool descriptions and must pick the right tool and fill schema-valid arguments |
+| **LLM Compatibility** | per-tool | A real LLM (via the unified AMAX Token Router gateway) reads tool descriptions and must pick the right tool and fill schema-valid arguments |
 | **Scenario Testing** | 6 | Multi-tool workflows with state passing (write -> read -> delete -> verify), audit consistency, persistence round-trips, plus an LLM Agent loop for composite task planning |
 
 Scores are aggregated into an **A+ to D grade** (functional 40% + performance 30% + security 30%).
 
 > These five dimensions are the platform's own implementation / teaching taxonomy. They are **not** a standards classification, and they are not the five testing dimensions on ISA104 Lecture 10 slide 8. The 18 standard cases, the A+~D grade and the 40/30/30 weights are lab implementation parameters, not a format prescribed by any standard. Metrics must not be mixed across the model / AI-system / agent-tool layers.
 
-## Course linkage (ISA104 Lab 5, Track B)
+## Course linkage (ISA104, Weeks 1-10)
 
-This repository is the upstream of the bundled student kit in `ISA104_Lab5/5. ISA104_Lab5_TrackB_server_kit/`. ISA104 Lab 5 has two equally weighted routes — Track A evaluates an agent's answers on the XIPU AI Agent platform; **Track B (this platform) evaluates the MCP server its tools depend on**. Either route is worth the same 100 marks; students choose one. The student kit contains its own task sheet, a one-click Windows launcher, and two lab servers; use that kit for teaching rather than asking students to clone this repository during class.
+This repository is the upstream of the bundled Track B server kit in
+`ISA104_Lab5/5. ISA104_Lab5_TrackB_server_kit/`. ISA104 Lab 5 now offers
+**three equally weighted routes** — Track A (the XIPU AI Agent platform),
+Track B (this MCP evaluation platform) and Track C (workflow runtime
+evaluation, zero-install). Students choose one; each has its own 100-mark
+teaching rubric. **Lab 5 is formative and carries no marks toward the module
+total** — the official assessment is an in-class test (35) plus a group
+demonstration (65).
 
-The hosted demo at `https://mcp-eval.streamlit.app` is **a demo only**. It requires Streamlit authentication and, being a cloud instance, cannot reach `localhost:8101` / `localhost:8102` on a student's machine. Lab 5 must be run locally.
+| Asset | Version | What changed after the w1-w9 prior-teaching audit |
+|---|---|---|
+| Lecture 10 | v7, 52 slides | "Where we are in the module" replaces a stale delivery table; a visible Prior ISA104 Vocabulary card closes the deck; two agent-evaluation surveys are disambiguated |
+| Lab 5 | v1.3, 43-file kit | All `[confirm: ...]` placeholders resolved; Lab LO1–Lab LO6 mapped to module LO A–E; prior-lecture bridges and an optional group-agent transfer task added |
+| Two-hour session | 91 slides | Visible vocabulary card, Session LO1–Session LO6, schedule TBC with no date published |
+| w1-w9 audit | v1.1 | [`docs/ISA104_Course_Alignment.md`](docs/ISA104_Course_Alignment.md) |
+| This app | unified v3 | Documentation-only ISA104 Course page; all LLM traffic through one AMAX Router gateway |
+
+The eight prior lecture decks (335 pages, four lecturers) already cover RAG
+evaluation, MCP, red teaming and human-centred design. Lecture 10 and Lab 5
+build on those topics rather than repeating them. Four different "five
+dimensions" and two different senses of "evaluation" are in circulation across
+the module; the visible vocabulary card on the last slide of both decks — and
+on the app's ISA104 Course page — reconciles them. See
+[`docs/ISA104_Lab5_TrackC.md`](docs/ISA104_Lab5_TrackC.md) for the third route.
+
+The hosted demo at `https://mcp-eval.streamlit.app` is **a demo only**. A cloud
+instance cannot reach `localhost:8101` / `localhost:8102` on a student's
+machine, so Lab 5 must be run locally with the bundled student kit.
 
 ## Standards context (not a compliance claim)
 
@@ -47,7 +72,7 @@ Official entry points: https://www.iso.org/standard/84127.html , https://www.iso
 
 - **Streamlit web UI** (9 pages) + Python evaluation engine, SQLite persistence
 - **Dual transport**: stdio (local subprocess) and SSE (remote HTTP) server connections
-- **LLM integration** via z-ai CLI (glm-4-plus) with automatic 429 backoff
+- **LLM integration** via one OpenAI-compatible gateway (`core/llm_client.py`) to the AMAX Token Router, with 429/5xx backoff; no CLI subprocess, no vendor-specific code
 - **Protocol-version awareness**: FN-001 adapts to stateless-core (2026-07-28) servers; Spec Conformance matrix page tracks version/capabilities per server
 - **Markdown report export** for every test run
 
@@ -57,8 +82,14 @@ Official entry points: https://www.iso.org/standard/84127.html , https://www.iso
 
 ```bash
 pip install -r requirements.txt
+export AMAX_API_KEY="sk-..."       # or use .streamlit/secrets.toml
+export AMAX_MODEL="gpt-4o"         # any model your account can reach
 streamlit run app.py
 ```
+
+The gateway uses the standard library only. See
+[`docs/AMAX_Router_Setup.md`](docs/AMAX_Router_Setup.md) and
+[`.streamlit/secrets.example.toml`](.streamlit/secrets.example.toml).
 
 Register a server (e.g. the bundled reference server):
 
@@ -100,6 +131,23 @@ The platform found two real defects in the self-developed Rust server (FedCtx), 
 
 1. **stdio log pollution** — tracing logs (with ANSI codes) were written to stdout, violating the MCP spec's requirement that stdout carry only JSON-RPC messages. Fixed by redirecting the tracing writer to stderr (`e291186`); retest: 0 parse errors.
 2. **Audit chain bypass** — MCP-path write operations (`insert_vector` / `add_graph_node` / `add_graph_edge`) skipped `audit.append` while the REST/gRPC paths audited, breaking the audit completeness contract. Caught by the SC-004 audit-consistency scenario; fixed in `a52aa74`; retest: 5/5 scenarios pass, audit entries grow on writes.
+
+## Hosted demo (Streamlit Cloud)
+
+Streamlit Cloud redeploys automatically on a push to `main`. In **App settings ->
+Secrets** set:
+
+```toml
+MCP_EVAL_DEMO_READONLY = "1"
+AMAX_API_KEY = "sk-..."                  # never commit a real key
+AMAX_BASE_URL = "https://ai.amaxsmp.com/v1"
+AMAX_MODEL = "gpt-4o"                   # override with a reachable model
+```
+
+Read-only mode hides every page that can register a server, launch a
+subprocess, call an LLM or write to the results database. The **ISA104 Course**
+page is documentation-only and stays available. On the public demo no LLM call
+is made at all. Full details: [`docs/AMAX_Router_Setup.md`](docs/AMAX_Router_Setup.md).
 
 ## License
 
