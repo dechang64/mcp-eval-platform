@@ -18,7 +18,22 @@ def render():
     from modules.utils import fmt_timestamp
 
     st.header("🤖 LLM Compatibility")
-    st.caption("A real LLM reads tool descriptions and executes tasks — measuring how \"LLM-legible\" the server is. Requires z-ai CLI + glm-4-plus.")
+    from core.llm_client import status as gateway_status
+
+    st.caption(
+        "A real LLM reads tool descriptions and executes tasks — measuring how "
+        "\"LLM-legible\" the server is. Every model call goes through the "
+        "unified AMAX Token Router gateway (core/llm_client.py)."
+    )
+    _gw = gateway_status()
+    if not _gw["configured"]:
+        st.warning(
+            "AMAX_API_KEY is not configured. Add it to Streamlit Cloud Secrets "
+            "(or export it locally) before running LLM compatibility tests. "
+            "See docs/AMAX_Router_Setup.md."
+        )
+    else:
+        st.caption("Gateway: %s · model: %s" % (_gw["base_url"], _gw["model"]))
 
     # Init llm tables
     _init_llm_tables()
@@ -77,7 +92,7 @@ def _init_llm_tables():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         server_id INTEGER NOT NULL,
         server_name TEXT NOT NULL,
-        model TEXT DEFAULT 'glm-4-plus',
+        model TEXT DEFAULT '',
         total INTEGER DEFAULT 0,
         tool_correct INTEGER DEFAULT 0,
         args_valid INTEGER DEFAULT 0,
@@ -182,11 +197,13 @@ Output JSON only: {{"tool": "tool_name", "arguments": {{...}}}}"""
         compat_results = [CompatResult(**r) for r in results]
         s = summarize(compat_results)
 
+        from core.llm_client import status as _gateway_status
+        _model_id = _gateway_status()["model"]
         conn = get_db()
         now = datetime.now().isoformat()
         cur = conn.execute(
             "INSERT INTO llm_runs (server_id, server_name, model, total, tool_correct, args_valid, tool_accuracy, args_valid_rate, overall, grade, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (server["id"], server["name"], "glm-4-plus", s.total,
+            (server["id"], server["name"], _model_id, s.total,
              sum(1 for r in results if r["tool_correct"]),
              sum(1 for r in results if r["tool_correct"] and r["args_valid"]),
              s.tool_accuracy, s.args_valid_rate, s.overall, s.grade, now),
