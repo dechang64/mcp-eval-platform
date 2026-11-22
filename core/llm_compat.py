@@ -13,43 +13,23 @@ Flow: connect to the server under test and fetch its tool list →
 import asyncio
 import json
 import re
-import subprocess
 import time
 from dataclasses import dataclass, field
 from typing import Optional
 
 
-# ── z-ai CLI wrapper ───────────────────────────────────────
+from core.llm_client import chat as _router_chat
+
+# -- single LLM entry point ------------------------------------------------
+# Task generation, tool selection and the agent loop all call llm_call().
+# It now delegates to core.llm_client, the one and only AMAX Token Router
+# gateway. The z-ai CLI subprocess was removed: it is unavailable on
+# Streamlit Cloud and forced every caller to depend on a local binary.
+
 
 def llm_call(prompt: str, system: str = "", retries: int = 3) -> str:
-    """Call the z-ai CLI and return the plain-text reply. Auto-backoff on 429."""
-    cmd = ["z-ai", "chat", "-p", prompt]
-    if system:
-        cmd += ["-s", system]
-    for attempt in range(retries):
-        try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            out = proc.stdout
-            # Filter init lines, parse JSON
-            lines = [l for l in out.splitlines() if not l.startswith("🚀")]
-            data = json.loads("\n".join(lines))
-            return data["choices"][0]["message"]["content"]
-        except subprocess.TimeoutExpired:
-            if attempt == retries - 1:
-                raise RuntimeError("z-ai CLI timeout")
-            time.sleep(5)
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
-            if attempt == retries - 1:
-                raise RuntimeError(f"z-ai output parse failed: {e}: {out[:200]}")
-            time.sleep(3)
-        except Exception as e:
-            if "429" in str(e) or "rate" in str(e).lower():
-                time.sleep(8 * (attempt + 1))
-            elif attempt == retries - 1:
-                raise
-            else:
-                time.sleep(3)
-    raise RuntimeError("unreachable")
+    """Return the plain-text reply from the unified AMAX Router gateway."""
+    return _router_chat(prompt, system=system, retries=retries)
 
 
 def extract_json(text: str) -> Optional[dict]:
